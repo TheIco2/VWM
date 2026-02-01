@@ -1,0 +1,38 @@
+[package]
+name = "sentinel-windowmanager"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ico2"]
+description = "Sentinel Tiling Window Manager"
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+windows-core = "0.62.2"
+windows = { version = "0.62.2", features = [
+    "Win32",
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_UI_Shell",
+    "Win32_System",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Pipes",
+    "Win32_System_WindowsProgramming",
+    "Win32_Storage",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.33"
+walkdir = "2.5"
+chrono = "0.4.43"
+notify = "8.2.0"
+widestring = "1.2.1"
+webview2-com = "0.38"
+wry = "0.54.1"
+raw-window-handle = "0.6"
+tao = "0.34.5"

@@ -1,0 +1,11 @@
+{
+    "id": "sentinel.addon.windowmanager",
+    "name": "Window Manager",
+    "package": "windowmanager",
+    "exe_path": "bin/sentinel-windowmanager.exe",
+    "version": "1.0.0",
+    "repo": "https://github.com/The-Ico2/sentinel-windowmanager",
+    "author": {
+        "Ico2": "https://github.com/The-Ico2"
+    }
+}
