@@ -6,12 +6,21 @@ log_level: warn  # Options: error, warn, info (info requires debug: true)
 window_manager:
   enabled: true
   manager_type: tiling  # Options: tiling, floating, stacking
+  padding: { # Padding around the screen edges/non-exclusive space in pixels
+    _top: 10,
+    _bottom: 10,
+    _left: 10,
+    _right: 10
+  }
   gap: 10               # Gap between windows in pixels
   border_width: 2       # Border width in pixels
   
   # Event handling
   debounce_ms: 500      # Delay in milliseconds before retiling after window events
   
+  # Animation settings
+  animation_enabled: false           # Enable/disable smooth animations (default: true)
+  animation_duration_ms: 150        # Animation duration in milliseconds (50-300 recommended)
   # Window filtering rules
   filters:
     # Minimum window size to manage (in pixels)

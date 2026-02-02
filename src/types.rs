@@ -57,8 +57,8 @@ pub struct WindowFilters {
 impl Default for WindowFilters {
     fn default() -> Self {
         WindowFilters {
-            min_width: Some(200),
-            min_height: Some(200),
+            min_width: None,  // Don't filter by size - let layout algorithm handle it
+            min_height: None, // This allows managing 6+ windows on a single monitor
             exclude_classes: Some(vec![
                 "Shell_TrayWnd".to_string(),
                 "Progman".to_string(),
@@ -89,7 +89,9 @@ pub struct WindowManagerConfig {
     pub manager_type: Option<ManagerType>,
     pub gap: Option<u32>,
     pub border_width: Option<u32>,
-        pub debounce_ms: Option<u64>,
+    pub debounce_ms: Option<u64>,
+    pub animation_enabled: Option<bool>,
+    pub animation_duration_ms: Option<u64>,
     pub filters: Option<WindowFilters>,
 }
 
@@ -100,7 +102,9 @@ impl Default for WindowManagerConfig {
             manager_type: Some(ManagerType::Tiling),
             gap: Some(10),
             border_width: Some(2),
-                        debounce_ms: Some(500),
+            debounce_ms: Some(500),
+            animation_enabled: Some(true),
+            animation_duration_ms: Some(150),
             filters: Some(WindowFilters::default()),
         }
     }

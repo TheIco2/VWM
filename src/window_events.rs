@@ -136,7 +136,7 @@ impl EventManager {
         states.values().any(|s| s.is_being_dragged)
     }
 
-    /// Schedule a retile after debounce delay
+    /// Schedule a retile after debounce delay (coalesces multiple events)
     pub fn schedule_retile(&self) {
         let monitors = self.monitors.clone();
         let configs = self.configs.clone();
@@ -165,6 +165,12 @@ impl EventManager {
                     let layout = get_layout_strategy(manager_type);
                     retile_windows(monitor, config, layout.as_ref());
                 }
+            }
+            
+            // Clean up stale window states (windows not seen in 5 seconds)
+            if let Ok(mut states) = window_states.lock() {
+                let now = Instant::now();
+                states.retain(|_, state| now.duration_since(state.last_event_time) < Duration::from_secs(5));
             }
         });
     }
@@ -234,10 +240,10 @@ unsafe extern "system" fn win_event_proc(
             manager.schedule_retile();
         }
         EVENT_OBJECT_LOCATIONCHANGE => {
-            // Don't trigger on every location change to avoid spam
-            // Only schedule retile if it's not being actively moved
-            if !manager.is_any_window_dragging() {
-                manager.schedule_retile();
+            // Skip retile if window is currently being animated - prevents feedback loops
+            if !crate::window_ops::is_window_animating(hwnd) {
+                // Ignore location changes during animation
+                // Windows should only be retiled on create/destroy/show/hide events
             }
         }
         _ => {}

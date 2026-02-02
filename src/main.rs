@@ -25,6 +25,7 @@ use windows::{
         Foundation::GetLastError,
         UI::{
             WindowsAndMessaging::*,
+            Accessibility::HWINEVENTHOOK,
         },
     },
 };
@@ -80,6 +81,8 @@ debug: false
 window_manager:
   enabled: true
   manager_type: tiling  # Options: tiling, floating, stacking
+  animation_enabled: false          # Disabled by default - animations cause gray boxes due to thread race conditions
+  animation_duration_ms: 300        # Only used if animation_enabled is true
   gap: 10               # Gap between windows in pixels
   border_width: 2       # Border width in pixels
   
@@ -146,6 +149,8 @@ fn main() -> windows::core::Result<()> {
     initial_startup();
     let mut debug_enabled = false;
     let mut log_level = "warn".to_string();
+    let mut window_manager_config = WindowManagerConfig::default();
+    
     if let Some(addons_dir) = _sentinel_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
         if let Some(value) = load_yaml(&yaml_path) {
@@ -158,6 +163,16 @@ fn main() -> windows::core::Result<()> {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_lowercase())
                 .unwrap_or_else(|| if debug_enabled { "info".to_string() } else { "warn".to_string() });
+            
+            // Load window manager configuration from YAML
+            if let Some(wm_value) = value.get("window_manager") {
+                if let Ok(config) = serde_yaml::from_value::<WindowManagerConfig>(wm_value.clone()) {
+                    window_manager_config = config;
+                    info!("[{}] Loaded window manager config from YAML", DEBUG_NAME);
+                } else {
+                    warn!("[{}] Failed to parse window_manager config, using defaults", DEBUG_NAME);
+                }
+            }
         }
     }
 
@@ -166,40 +181,47 @@ fn main() -> windows::core::Result<()> {
         error!("[{}] Panic: {}", DEBUG_NAME, info);
     }));
     info!("[{}] Window Manager addon starting", DEBUG_NAME);
+    info!("[{}] Window Manager enabled: {}", DEBUG_NAME, window_manager_config.enabled);
     
 
     unsafe {
-        // get monitors from IPC
-        let ipc_displays = ipc_get_displays().unwrap_or_default();
-        // If DisplayInfo and MonitorInfo are the same, you can use DisplayInfo directly.
-        // Otherwise, convert DisplayInfo to MonitorInfo as needed.
-        let monitors: Vec<DisplayInfo> = ipc_displays.into_iter().collect();
-        if monitors.is_empty() {
-            error!("[{}] No monitors received from IPC", DEBUG_NAME);
-            return Ok(());
+        let mut hooks: Option<Vec<HWINEVENTHOOK>> = None;
+
+        if window_manager_config.enabled {
+            // get monitors from IPC
+            let ipc_displays = ipc_get_displays().unwrap_or_default();
+            // If DisplayInfo and MonitorInfo are the same, you can use DisplayInfo directly.
+            // Otherwise, convert DisplayInfo to MonitorInfo as needed.
+            let monitors: Vec<DisplayInfo> = ipc_displays.into_iter().collect();
+            if monitors.is_empty() {
+                error!("[{}] No monitors received from IPC", DEBUG_NAME);
+                return Ok(());
+            }
+
+            info!("[{}] Starting Window Manager for {} monitor(s)", DEBUG_NAME, monitors.len());
+
+            // Use the loaded config for all monitors
+            let mut configs = Vec::new();
+            for (idx, monitor) in monitors.iter().cloned().enumerate() {
+                info!("[{}] Initializing Window Manager for monitor {} ({}x{})", 
+                      DEBUG_NAME, idx, monitor.width, monitor.height);
+                
+                let manager_type = window_manager_config.manager_type.unwrap_or_default();
+                info!("[{}] Monitor {} using {} layout manager (debounce: {}ms, animation: {})", 
+                      DEBUG_NAME, idx, manager_type, 
+                      window_manager_config.debounce_ms.unwrap_or(500),
+                      window_manager_config.animation_enabled.unwrap_or(true));
+                configs.push(window_manager_config.clone());
+            }
+
+            // Set up event-driven management with debounce and drag detection
+            let event_manager = EventManager::new(monitors.clone(), configs);
+            set_event_manager(event_manager);
+            hooks = Some(setup_event_hooks());
+            info!("[{}] Event hooks installed - window manager is now active", DEBUG_NAME);
+        } else {
+            info!("[{}] Window Manager disabled in config - staying idle", DEBUG_NAME);
         }
-
-        info!("[{}] Starting Window Manager for {} monitor(s)", DEBUG_NAME, monitors.len());
-
-        // Collect configs for event-driven window management
-        let mut configs = Vec::new();
-        for (idx, monitor) in monitors.iter().cloned().enumerate() {
-            info!("[{}] Initializing Window Manager for monitor {} ({}x{})", 
-                  DEBUG_NAME, idx, monitor.width, monitor.height);
-            
-            // Create default config for this monitor
-            let config = WindowManagerConfig::default();
-            let manager_type = config.manager_type.unwrap_or_default();
-            info!("[{}] Monitor {} using {} layout manager", 
-                  DEBUG_NAME, idx, manager_type);
-            configs.push(config);
-        }
-
-        // Set up event-driven management with debounce and drag detection
-        let event_manager = EventManager::new(monitors.clone(), configs);
-        set_event_manager(event_manager);
-        let hooks = setup_event_hooks();
-        info!("[{}] Event hooks installed - window manager is now active", DEBUG_NAME);
 
         if let Some(addons_dir) = _sentinel_addons_dir() {
             let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
@@ -225,7 +247,9 @@ fn main() -> windows::core::Result<()> {
             DispatchMessageW(&msg);
         }
 
-        cleanup_event_hooks(hooks);
+        if let Some(hooks) = hooks {
+            cleanup_event_hooks(hooks);
+        }
     }
 
     Ok(())
