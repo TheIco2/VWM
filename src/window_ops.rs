@@ -10,6 +10,7 @@ use windows::{
         Foundation::{HWND, LPARAM, RECT},
         UI::WindowsAndMessaging::*,
         System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_FORMAT},
+        Graphics::Gdi::{InvalidateRect, UpdateWindow},
     },
 };
 use std::mem;
@@ -288,7 +289,7 @@ pub fn apply_layout(
             );
             
             // Force redraw to prevent grey box artifacts
-            let _ = InvalidateRect(window.hwnd, None, true.into());
+            let _ = InvalidateRect(Some(window.hwnd), None, true.into());
             let _ = UpdateWindow(window.hwnd);
         }
     }
