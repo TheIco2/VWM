@@ -125,6 +125,7 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
+    info!("[{}] Window Manager addon starting", DEBUG_NAME);
     initial_startup();
     logging::init(true);
     
