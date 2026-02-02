@@ -21,18 +21,18 @@ use crate::utility::_sentinel_root_dir;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_TX: OnceLock<Sender<String>> = OnceLock::new();
+static LOG_LEVEL: OnceLock<String> = OnceLock::new();
 
 /* =========================
    PUBLIC API
    ========================= */
 
-pub fn init(debug: bool) {
+pub fn init(debug: bool, level: &str) {
     if LOG_TX.get().is_some() {
         panic!("logging::init() called more than once");
     }
 
-    ENABLED.store(debug, Ordering::Relaxed);
-
+    ENABLED.store(debug, Ordering::Relaxed);    let _ = LOG_LEVEL.set(level.to_lowercase());
     let path = log_path().clone();
     let (tx, rx) = mpsc::channel::<String>();
     LOG_TX.set(tx).expect("LOG_TX already set");
@@ -54,6 +54,14 @@ pub fn init(debug: bool) {
 #[inline]
 pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
+}
+
+#[inline]
+pub fn should_log(level: &str) -> bool {
+    if !ENABLED.load(Ordering::Relaxed) {
+        return level == "WARN" || level == "ERROR";
+    }
+    true
 }
 
 /* =========================
@@ -80,7 +88,7 @@ fn timestamp() -> String {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
-        if $crate::logging::enabled() {
+        if $crate::logging::should_log("INFO") {
             $crate::logging::enqueue(
                 "INFO",
                 format!($($arg)*)

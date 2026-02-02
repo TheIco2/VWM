@@ -6,18 +6,23 @@ mod ipc_connector;
 mod logging;
 mod layout;
 mod types;
+mod window_ops;
+mod window_events;
 
 mod utility;
 mod watchers;
 mod data_loaders;
 
 use ipc_connector::request;
-use types::{DisplayInfo, WindowManager, WindowManagerConfig};
+use data_loaders::yaml::load_yaml;
+use types::{DisplayInfo, WindowManagerConfig};
+use window_events::{EventManager, setup_event_hooks, cleanup_event_hooks, set_event_manager};
 use watchers::yaml_watcher;
 use utility::{_sentinel_addons_dir, _sentinel_assets_dir};
 
 use windows::{
     Win32::{
+        Foundation::GetLastError,
         UI::{
             WindowsAndMessaging::*,
         },
@@ -76,7 +81,20 @@ window_manager:
   enabled: true
   manager_type: tiling  # Options: tiling, floating, stacking
   gap: 10               # Gap between windows in pixels
-  border_width: 2       # Border width in pixels"#;
+  border_width: 2       # Border width in pixels
+  
+  filters:
+    min_width: 200
+    min_height: 200
+    exclude_classes:
+      - "Shell_TrayWnd"
+      - "Progman"
+      - "WorkerW"
+    exclude_titles:
+      - "Program Manager"
+    include_processes: []
+    exclude_processes:
+      - "explorer.exe""#;
 
             if let Err(e) = std::fs::write(&yaml_path, default_yaml) {
                 error!("[{}] Failed to create default config.yaml: {}", DEBUG_NAME, e);
@@ -125,9 +143,29 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
-    info!("[{}] Window Manager addon starting", DEBUG_NAME);
     initial_startup();
-    logging::init(true);
+    let mut debug_enabled = false;
+    let mut log_level = "warn".to_string();
+    if let Some(addons_dir) = _sentinel_addons_dir() {
+        let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
+        if let Some(value) = load_yaml(&yaml_path) {
+            debug_enabled = value
+                .get("debug")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            log_level = value
+                .get("log_level")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_lowercase())
+                .unwrap_or_else(|| if debug_enabled { "info".to_string() } else { "warn".to_string() });
+        }
+    }
+
+    logging::init(debug_enabled, &log_level);
+    std::panic::set_hook(Box::new(|info| {
+        error!("[{}] Panic: {}", DEBUG_NAME, info);
+    }));
+    info!("[{}] Window Manager addon starting", DEBUG_NAME);
     
 
     unsafe {
@@ -143,18 +181,25 @@ fn main() -> windows::core::Result<()> {
 
         info!("[{}] Starting Window Manager for {} monitor(s)", DEBUG_NAME, monitors.len());
 
-        // For each monitor, create a Window Manager only if Monitor is Enabled in Config
+        // Collect configs for event-driven window management
+        let mut configs = Vec::new();
         for (idx, monitor) in monitors.iter().cloned().enumerate() {
             info!("[{}] Initializing Window Manager for monitor {} ({}x{})", 
                   DEBUG_NAME, idx, monitor.width, monitor.height);
             
             // Create default config for this monitor
             let config = WindowManagerConfig::default();
-            let window_manager = WindowManager::new(monitor.clone(), config);
-            
+            let manager_type = config.manager_type.unwrap_or_default();
             info!("[{}] Monitor {} using {} layout manager", 
-                  DEBUG_NAME, idx, window_manager.config.manager_type.unwrap_or_default());
+                  DEBUG_NAME, idx, manager_type);
+            configs.push(config);
         }
+
+        // Set up event-driven management with debounce and drag detection
+        let event_manager = EventManager::new(monitors.clone(), configs);
+        set_event_manager(event_manager);
+        let hooks = setup_event_hooks();
+        info!("[{}] Event hooks installed - window manager is now active", DEBUG_NAME);
 
         if let Some(addons_dir) = _sentinel_addons_dir() {
             let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
@@ -164,10 +209,23 @@ fn main() -> windows::core::Result<()> {
         }
 
         let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, None, 0, 0).into() {
+        loop {
+            let result = GetMessageW(&mut msg, None, 0, 0);
+            if result.0 == 0 {
+                warn!("[{}] Message loop exited (WM_QUIT received)", DEBUG_NAME);
+                break;
+            }
+            if result.0 == -1 {
+                let err = GetLastError();
+                error!("[{}] Message loop error: {:?}", DEBUG_NAME, err);
+                break;
+            }
+
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        cleanup_event_hooks(hooks);
     }
 
     Ok(())

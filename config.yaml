@@ -1,5 +1,6 @@
 update_check: true
 debug: false
+log_level: warn  # Options: error, warn, info (info requires debug: true)
 
 # Window Manager Configuration
 window_manager:
@@ -7,3 +8,42 @@ window_manager:
   manager_type: tiling  # Options: tiling, floating, stacking
   gap: 10               # Gap between windows in pixels
   border_width: 2       # Border width in pixels
+  
+  # Event handling
+  debounce_ms: 500      # Delay in milliseconds before retiling after window events
+  
+  # Window filtering rules
+  filters:
+    # Minimum window size to manage (in pixels)
+    min_width: 100
+    min_height: 100
+    
+    # Window classes/titles to exclude (case-insensitive partial match)
+    exclude_classes:
+      - "Shell_TrayWnd"        # Taskbar
+      - "Progman"              # Desktop
+      - "WorkerW"              # Desktop worker
+      - "Windows.UI.Core"      # Modern UI elements
+      - "ApplicationFrameWindow"  # Some UWP apps
+    
+    exclude_titles:
+      - "Program Manager"
+      - "NVIDIA GeForce Overlay"
+      - "Windows Input Experience"
+      - "Task Manager"
+      - "Settings"
+      - "PowerToys Quick Access"
+    
+    # Include only windows with these process names (leave empty to include all)
+    # Examples: ["chrome.exe", "code.exe", "notepad.exe"]
+    include_processes: []
+    
+    # Exclude specific process names
+    exclude_processes:
+      - "explorer.exe"
+      - "SearchHost.exe"
+      - "ShellExperienceHost.exe"
+      - "taskmgr.exe"
+      - "systemsettings.exe"
+      - "steamwebhelper.exe"
+      - "msiexec.exe"
