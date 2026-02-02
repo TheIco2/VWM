@@ -1,2 +1,9 @@
 update_check: true
 debug: false
+
+# Window Manager Configuration
+window_manager:
+  enabled: true
+  manager_type: tiling  # Options: tiling, floating, stacking
+  gap: 10               # Gap between windows in pixels
+  border_width: 2       # Border width in pixels

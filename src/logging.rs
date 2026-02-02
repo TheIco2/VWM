@@ -12,6 +12,8 @@ use std::{
 
 use chrono;
 
+use crate::utility::_sentinel_root_dir;
+
 /* =========================
    GLOBAL STATE
    ========================= */
@@ -113,9 +115,8 @@ macro_rules! error {
 
 fn log_path() -> &'static PathBuf {
     LOG_PATH.get_or_init(|| {
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.join("sentinel.addon.statusbar.log")))
-            .unwrap_or_else(|| PathBuf::from("sentinel.addon.statusbar.log"))
+        _sentinel_root_dir()
+            .map(|p| p.join("sentinel.log"))
+            .unwrap_or_else(|| PathBuf::from("sentinel.log"))
     })
 }
