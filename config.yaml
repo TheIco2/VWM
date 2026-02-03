@@ -1,32 +1,30 @@
 update_check: true
-debug: false
+debug: true
 log_level: warn  # Options: error, warn, info (info requires debug: true)
 
 # Window Manager Configuration
 window_manager:
   enabled: true
   manager_type: tiling  # Options: tiling, floating, stacking
-  padding: { # Padding around the screen edges/non-exclusive space in pixels
-    _top: 10,
-    _bottom: 10,
-    _left: 10,
-    _right: 10
-  }
+  animation_enabled: true          # Disabled
+  animation_duration_ms: 300       # Only used if animation_enabled is true
+
   gap: 10               # Gap between windows in pixels
   border_width: 2       # Border width in pixels
   
   # Event handling
   debounce_ms: 500      # Delay in milliseconds before retiling after window events
   
-  # Animation settings
-  animation_enabled: false           # Enable/disable smooth animations (default: true)
-  animation_duration_ms: 150        # Animation duration in milliseconds (50-300 recommended)
   # Window filtering rules
   filters:
     # Minimum window size to manage (in pixels)
-    min_width: 100
-    min_height: 100
+    min_width: 1
+    min_height: 1
     
+    # Include only windows with these process names (leave empty to include all)
+    # Examples: ["chrome.exe", "code.exe", "notepad.exe"]
+    include_processes: []
+
     # Window classes/titles to exclude (case-insensitive partial match)
     exclude_classes:
       - "Shell_TrayWnd"        # Taskbar
@@ -42,11 +40,7 @@ window_manager:
       - "Task Manager"
       - "Settings"
       - "PowerToys Quick Access"
-    
-    # Include only windows with these process names (leave empty to include all)
-    # Examples: ["chrome.exe", "code.exe", "notepad.exe"]
-    include_processes: []
-    
+
     # Exclude specific process names
     exclude_processes:
       - "explorer.exe"
@@ -56,3 +50,5 @@ window_manager:
       - "systemsettings.exe"
       - "steamwebhelper.exe"
       - "msiexec.exe"
+      - "sentinel-statusbar.exe"
+      - "code.exe"

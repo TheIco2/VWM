@@ -4,51 +4,19 @@
 use crate::{info, DEBUG_NAME};
 use crate::types::{DisplayInfo, ManagedWindow, WindowFilters, WindowManagerConfig};
 use crate::layout::LayoutStrategy;
+use crate::animations::animate_windows_batched;
 use windows::{
     core::{BOOL, PWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, RECT},
         UI::WindowsAndMessaging::*,
         System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_FORMAT},
-        Graphics::Gdi::{RedrawWindow, InvalidateRect, RDW_FRAME, RDW_INVALIDATE, RDW_UPDATENOW, RDW_ALLCHILDREN, RDW_ERASE},
     },
 };
 use std::mem;
-use std::thread;
-use std::time::Duration;
-use std::sync::{Arc, Mutex, OnceLock};
-use std::collections::HashSet;
 
 const DEBUG_SUBTAG: &str = "WINDOW_OPS";
-const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms to allow content to redraw
-const ANIMATION_STEPS: u64 = 8;          // Reasonable default - prevents app crashes
-const MAX_ANIMATION_STEPS: u64 = 30;     // Cap to prevent overwhelming application message queues
-const MIN_FRAME_DELAY_MS: u64 = 10;      // Minimum 10ms between frames - apps need time to process messages
-
-// Track windows currently being animated to prevent event-triggered retiles from interfering
-static ANIMATING_WINDOWS: OnceLock<Arc<Mutex<HashSet<isize>>>> = OnceLock::new();
-
-fn get_animating_windows() -> Arc<Mutex<HashSet<isize>>> {
-    Arc::clone(ANIMATING_WINDOWS.get_or_init(|| Arc::new(Mutex::new(HashSet::new()))))
-}
-
-pub fn is_window_animating(hwnd: HWND) -> bool {
-    match get_animating_windows().lock() {
-        Ok(set) => set.contains(&(hwnd.0 as isize)),
-        Err(_) => false,
-    }
-}
-
-fn mark_window_animating(hwnd: HWND, animating: bool) {
-    if let Ok(mut set) = get_animating_windows().lock() {
-        let hwnd_val = hwnd.0 as isize;
-        if animating {
-            set.insert(hwnd_val);
-        } else {
-            set.remove(&hwnd_val);
-        }
-    }
-}
+const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms smooth animation
 
 /// Get window title
 pub fn get_window_title(hwnd: HWND) -> String {
@@ -286,129 +254,7 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &WindowFilters) -> Vec<
     .collect::<Vec<ManagedWindow>>()
 }
 
-/// Easing function for smooth animation (ease-out cubic)
-/// Returns a value from 0.0 to 1.0 based on progress (0.0 to 1.0)
-fn easing_ease_out_cubic(progress: f32) -> f32 {
-    let p = progress;
-    1.0 - (1.0 - p).powf(3.0)
-}
-
-/// Interpolate between two rectangles with easing
-fn interpolate_rect(from: RECT, to: RECT, progress: f32) -> RECT {
-    let eased = easing_ease_out_cubic(progress);
-    RECT {
-        left: (from.left as f32 + (to.left as f32 - from.left as f32) * eased) as i32,
-        top: (from.top as f32 + (to.top as f32 - from.top as f32) * eased) as i32,
-        right: (from.right as f32 + (to.right as f32 - from.right as f32) * eased) as i32,
-        bottom: (from.bottom as f32 + (to.bottom as f32 - from.bottom as f32) * eased) as i32,
-    }
-}
-
-/// Animate a window from its current position to target position smoothly
-fn animate_window(hwnd: HWND, target_rect: RECT, duration_ms: u64) {
-    // Extract raw handle to make it Send
-    let hwnd_raw = hwnd.0 as isize;
-    
-    // Mark this window as animating to prevent event-driven retiles from interfering
-    mark_window_animating(hwnd, true);
-    
-    thread::spawn(move || {
-        unsafe {
-            // Reconstruct HWND from raw handle
-            let hwnd = HWND(hwnd_raw as *mut std::ffi::c_void);
-            
-            // Get current window position
-            let mut current_rect: RECT = mem::zeroed();
-            if GetWindowRect(hwnd, &mut current_rect).is_err() {
-                mark_window_animating(hwnd, false);
-                return;
-            }
-
-            // Skip animation if already at target
-            if current_rect == target_rect {
-                mark_window_animating(hwnd, false);
-                return;
-            }
-
-            // SAFETY: Cap animation steps to prevent overwhelming application message queues
-            // Each step = one SetWindowPos = one WM_SIZE/WM_MOVE message to the app
-            let safe_steps = (ANIMATION_STEPS).min(MAX_ANIMATION_STEPS);
-            let frame_delay = Duration::from_millis(duration_ms / safe_steps);
-            
-            // SAFETY: Enforce minimum frame delay to give apps time to process messages
-            let frame_delay = frame_delay.max(Duration::from_millis(MIN_FRAME_DELAY_MS));
-            
-            if safe_steps < ANIMATION_STEPS {
-                info!("[{}][{}] Animation steps capped from {} to {} for safety (min frame delay: {}ms)",
-                      DEBUG_NAME, DEBUG_SUBTAG, ANIMATION_STEPS, safe_steps, MIN_FRAME_DELAY_MS);
-            }
-
-            // Animate through frames - force complete redraws to prevent gray boxes
-            for frame in 0..=safe_steps {
-                let progress = frame as f32 / safe_steps as f32;
-                let animated_rect = interpolate_rect(current_rect, target_rect, progress);
-
-                let width = animated_rect.right - animated_rect.left;
-                let height = animated_rect.bottom - animated_rect.top;
-
-                // Move window with flags that force complete window redraw to prevent gray boxes
-                // SWP_DRAWFRAME + SWP_FRAMECHANGED ensures window chrome and content are redrawn
-                let _ = SetWindowPos(
-                    hwnd,
-                    None,
-                    animated_rect.left,
-                    animated_rect.top,
-                    width,
-                    height,
-                    SWP_NOACTIVATE | SWP_NOZORDER | SWP_DRAWFRAME,
-                );
-
-                // Force immediate window content update to prevent gray boxes
-                let _ = RedrawWindow(
-                    Some(hwnd),
-                    None,
-                    None,
-                    RDW_UPDATENOW,
-                );
-
-                if frame < ANIMATION_STEPS {
-                    thread::sleep(frame_delay);
-                    // Extra delay to allow window content to catch up and redraw
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
-
-            // Final position - ensure it's exactly at target with full redraw
-            let width = target_rect.right - target_rect.left;
-            let height = target_rect.bottom - target_rect.top;
-            let _ = SetWindowPos(
-                hwnd,
-                None,
-                target_rect.left,
-                target_rect.top,
-                width,
-                height,
-                SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_DRAWFRAME,
-            );
-            
-            // Force complete window redraw to eliminate any gray box artifacts
-            let _ = RedrawWindow(
-                Some(hwnd),
-                None,
-                None,
-                RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_ERASE,
-            );
-            
-            // Critical delay: Give window content time to fully render at final position
-            thread::sleep(Duration::from_millis(50));
-            
-            // Animation complete - mark window as no longer animating so retiles can resume
-            mark_window_animating(hwnd, false);
-        }
-    });
-}
-
-/// Apply layout to windows with smooth animations
+/// Apply layout to windows with smooth synchronized animations
 pub fn apply_layout(
     windows: &[ManagedWindow],
     display: &DisplayInfo,
@@ -417,48 +263,81 @@ pub fn apply_layout(
 ) {
     info!("[{}][{}] Applying layout to {} windows", DEBUG_NAME, DEBUG_SUBTAG, windows.len());
 
-    let animation_enabled = config.animation_enabled.unwrap_or(false);  // DEFAULT: false to prevent gray boxes
+    let animation_enabled = config.animation_enabled.unwrap_or(false);
     let animation_duration = config.animation_duration_ms.unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
 
+    // Calculate target layouts for all windows
+    let mut target_layouts = Vec::new();
     for (idx, window) in windows.iter().enumerate() {
         let rect = layout_strategy.calculate_layout(display, windows.len(), idx, config);
-        
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
         
         info!("[{}][{}] Layout window '{}' to ({}, {}) with size {}x{}", 
               DEBUG_NAME, DEBUG_SUBTAG, window.title, rect.left, rect.top, width, height);
         
+        target_layouts.push((window.hwnd, rect));
+    }
 
-        if animation_enabled {
-            // Use animation for smooth transition (but this can cause gray boxes with concurrent threads)
-            animate_window(window.hwnd, rect, animation_duration);
-        } else {
-            // Instant positioning without animation - MOST RELIABLE, no gray boxes
-            unsafe {
-                let _ = SetWindowPos(
-                    window.hwnd,
-                    None,
-                    rect.left,
-                    rect.top,
-                    width,
-                    height,
-                    SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_DRAWFRAME,
-                );
-                
-                // Invalidate entire window region to force repaint
-                let _ = InvalidateRect(Some(window.hwnd), None, true);
-                
-                // Force comprehensive redraw to eliminate gray boxes
-                let _ = RedrawWindow(
-                    Some(window.hwnd),
-                    None,
-                    None,
-                    RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_ERASE,
-                );
-                
-                // Give content time to render at new size/position
-                thread::sleep(Duration::from_millis(20));
+    if animation_enabled {
+        // Collect current positions for all windows
+        let mut animation_data = Vec::new();
+        unsafe {
+            for (hwnd, target_rect) in &target_layouts {
+                let mut current_rect: RECT = mem::zeroed();
+                if GetWindowRect(*hwnd, &mut current_rect).is_ok() {
+                    // Only animate if position will actually change
+                    if current_rect != *target_rect {
+                        animation_data.push((*hwnd, current_rect, *target_rect));
+                    } else {
+                        // Position already correct, just apply it
+                        let width = target_rect.right - target_rect.left;
+                        let height = target_rect.bottom - target_rect.top;
+                        let _ = SetWindowPos(
+                            *hwnd,
+                            None,
+                            target_rect.left,
+                            target_rect.top,
+                            width,
+                            height,
+                            SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_DRAWFRAME,
+                        );
+                    }
+                }
+            }
+        }
+
+        // Animate all windows together synchronously
+        if !animation_data.is_empty() {
+            animate_windows_batched(&animation_data, animation_duration);
+        }
+    } else {
+        // Instant positioning - apply all at once atomically
+        unsafe {
+            if !target_layouts.is_empty() {
+                if let Ok(hdwp) = BeginDeferWindowPos(target_layouts.len() as i32) {
+                    let mut hdwp_result = hdwp;
+
+                    for (hwnd, rect) in &target_layouts {
+                        let width = rect.right - rect.left;
+                        let height = rect.bottom - rect.top;
+
+                        if let Ok(new_hdwp) = DeferWindowPos(
+                            hdwp_result,
+                            *hwnd,
+                            None,
+                            rect.left,
+                            rect.top,
+                            width,
+                            height,
+                            SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_DRAWFRAME,
+                        ) {
+                            hdwp_result = new_hdwp;
+                        }
+                    }
+
+                    let _ = EndDeferWindowPos(hdwp_result);
+                }
             }
         }
     }

@@ -128,20 +128,14 @@ impl EventManager {
         }
     }
 
-    /// Check if any window is currently being dragged
-    pub fn is_any_window_dragging(&self) -> bool {
-        let Ok(states) = self.window_states.lock() else {
-            return false;
-        };
-        states.values().any(|s| s.is_being_dragged)
-    }
-
-    /// Schedule a retile after debounce delay (coalesces multiple events)
-    pub fn schedule_retile(&self) {
+    /// Schedule a retile after debounce delay for the specific window's monitor
+    /// This is more efficient than retiling all monitors
+    pub fn schedule_retile_for_window(&self, affected_hwnd: HWND) {
         let monitors = self.monitors.clone();
         let configs = self.configs.clone();
         let debounce_delay = self.debounce_delay;
         let window_states = Arc::clone(&self.window_states);
+        let hwnd_val = affected_hwnd.0 as isize;  // Convert HWND to isize for thread safety
 
         std::thread::spawn(move || {
             std::thread::sleep(debounce_delay);
@@ -158,12 +152,61 @@ impl EventManager {
                 }
             }
 
-            // Retile all monitors
-            for (monitor, config) in monitors.iter().zip(configs.iter()) {
-                if config.enabled {
-                    let manager_type = config.manager_type.unwrap_or_default();
-                    let layout = get_layout_strategy(manager_type);
-                    retile_windows(monitor, config, layout.as_ref());
+            // Reconstruct HWND from isize
+            let affected_hwnd = HWND(hwnd_val as *mut std::ffi::c_void);
+
+            // Find which monitor this window belongs to and retile only that monitor
+            use windows::Win32::Foundation::RECT;
+            use std::mem;
+            use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+
+            let mut window_rect: RECT = unsafe { mem::zeroed() };
+            let result = unsafe { GetWindowRect(affected_hwnd, &mut window_rect) };
+            
+            if result.is_err() {
+                // Fallback: retile all monitors if we can't get window rect
+                info!("[{}][{}] Could not get window rect, retiling all monitors", DEBUG_NAME, DEBUG_SUBTAG);
+                for (monitor, config) in monitors.iter().zip(configs.iter()) {
+                    if config.enabled {
+                        let manager_type = config.manager_type.unwrap_or_default();
+                        let layout = get_layout_strategy(manager_type);
+                        retile_windows(monitor, config, layout.as_ref());
+                    }
+                }
+            } else {
+                // Retile only the monitor containing this window
+                let window_center_x = (window_rect.left + window_rect.right) / 2;
+                let window_center_y = (window_rect.top + window_rect.bottom) / 2;
+                let mut retiled_any = false;
+
+                for (monitor, config) in monitors.iter().zip(configs.iter()) {
+                    if config.enabled {
+                        // Check if window is on this monitor
+                        if window_center_x >= monitor.x 
+                            && window_center_x < monitor.x + monitor.width
+                            && window_center_y >= monitor.y
+                            && window_center_y < monitor.y + monitor.height {
+                            
+                            info!("[{}][{}] Retiling affected monitor at ({}, {})", DEBUG_NAME, DEBUG_SUBTAG, monitor.x, monitor.y);
+                            let manager_type = config.manager_type.unwrap_or_default();
+                            let layout = get_layout_strategy(manager_type);
+                            retile_windows(monitor, config, layout.as_ref());
+                            retiled_any = true;
+                            break;  // Only retile the first matching monitor
+                        }
+                    }
+                }
+
+                if !retiled_any {
+                    // Window not found on any monitor, retile all (shouldn't happen often)
+                    info!("[{}][{}] Window not on any monitor, retiling all", DEBUG_NAME, DEBUG_SUBTAG);
+                    for (monitor, config) in monitors.iter().zip(configs.iter()) {
+                        if config.enabled {
+                            let manager_type = config.manager_type.unwrap_or_default();
+                            let layout = get_layout_strategy(manager_type);
+                            retile_windows(monitor, config, layout.as_ref());
+                        }
+                    }
                 }
             }
             
@@ -215,15 +258,16 @@ unsafe extern "system" fn win_event_proc(
                 info!("[{}][{}] Window created/shown: {:?}", DEBUG_NAME, DEBUG_SUBTAG, hwnd);
             }
             manager.mark_window_created(hwnd);
-            // Don't retile immediately - wait to see if it's being dragged
-            manager.schedule_retile();
+            // Schedule retile for only the affected monitor
+            manager.schedule_retile_for_window(hwnd);
         }
         EVENT_OBJECT_DESTROY | EVENT_OBJECT_HIDE => {
             if manager.should_log_event(hwnd, EventKind::DestroyHide) {
                 info!("[{}][{}] Window destroyed/hidden: {:?}", DEBUG_NAME, DEBUG_SUBTAG, hwnd);
             }
             manager.remove_window(hwnd);
-            manager.schedule_retile();
+            // Schedule retile for only the affected monitor
+            manager.schedule_retile_for_window(hwnd);
         }
         EVENT_SYSTEM_MOVESIZESTART => {
             if manager.should_log_event(hwnd, EventKind::MoveSizeStart) {
@@ -237,11 +281,11 @@ unsafe extern "system" fn win_event_proc(
             }
             manager.mark_window_dragging(hwnd, false);
             // Window was released - now we can retile
-            manager.schedule_retile();
+            manager.schedule_retile_for_window(hwnd);
         }
         EVENT_OBJECT_LOCATIONCHANGE => {
             // Skip retile if window is currently being animated - prevents feedback loops
-            if !crate::window_ops::is_window_animating(hwnd) {
+            if !crate::animations::is_window_animating(hwnd) {
                 // Ignore location changes during animation
                 // Windows should only be retiled on create/destroy/show/hide events
             }
@@ -300,20 +344,12 @@ pub fn setup_event_hooks() -> Vec<HWINEVENTHOOK> {
             info!("[{}][{}] Set up MOVESIZE event hook", DEBUG_NAME, DEBUG_SUBTAG);
         }
 
-        // Hook for location changes
-        let hook = SetWinEventHook(
-            EVENT_OBJECT_LOCATIONCHANGE,
-            EVENT_OBJECT_LOCATIONCHANGE,
-            None,
-            Some(win_event_proc),
-            0,
-            0,
-            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
-        );
-        if hook.0 != std::ptr::null_mut() {
-            hooks.push(hook);
-            info!("[{}][{}] Set up LOCATIONCHANGE event hook", DEBUG_NAME, DEBUG_SUBTAG);
-        }
+        // NOTE: EVENT_OBJECT_LOCATIONCHANGE hook intentionally disabled
+        // This event fires for every pixel of movement which causes:
+        // 1. Excessive retiling attempts on mouse drag
+        // 2. Content displacement in managed windows  
+        // 3. Performance degradation with multiple windows
+        // Layout updates should only trigger on CREATE/DESTROY/SHOW/HIDE events
     }
 
     info!("[{}][{}] Set up {} event hooks", DEBUG_NAME, DEBUG_SUBTAG, hooks.len());

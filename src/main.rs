@@ -6,6 +6,7 @@ mod ipc_connector;
 mod logging;
 mod layout;
 mod types;
+mod animations;
 mod window_ops;
 mod window_events;
 
@@ -81,8 +82,8 @@ debug: false
 window_manager:
   enabled: true
   manager_type: tiling  # Options: tiling, floating, stacking
-  animation_enabled: false          # Disabled by default - animations cause gray boxes due to thread race conditions
-  animation_duration_ms: 300        # Only used if animation_enabled is true
+  animation_enabled: true           # Smooth synchronized animations using DeferWindowPos (no gray boxes)
+  animation_duration_ms: 300        # 300ms smooth animation with 16 frames
   gap: 10               # Gap between windows in pixels
   border_width: 2       # Border width in pixels
   
