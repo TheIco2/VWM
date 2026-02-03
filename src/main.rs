@@ -6,7 +6,6 @@ mod ipc_connector;
 mod logging;
 mod layout;
 mod types;
-mod animations;
 mod window_ops;
 mod window_events;
 
