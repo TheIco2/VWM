@@ -160,13 +160,13 @@ impl LayoutStrategy for TilingLayout {
         config: &WindowManagerConfig,
     ) -> RECT {
         let gap = config.gap.unwrap_or(10) as i32;
-        let work = monitor_work_area();
-
+        
+        // Use the display parameter passed in, not the system work area
         let initial_rect = RECT {
-            left: work.left + gap,
-            top: work.top + gap,
-            right: work.right - gap,
-            bottom: work.bottom - gap,
+            left: display.x + gap,
+            top: display.y + gap,
+            right: display.x + display.width - gap,
+            bottom: display.y + display.height - gap,
         };
 
         // Start with first window taking full space

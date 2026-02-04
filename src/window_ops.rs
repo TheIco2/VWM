@@ -8,15 +8,14 @@ use crate::layout::LayoutStrategy;
 use windows::{
     core::{BOOL, PWSTR},
     Win32::{
-        Foundation::{HWND, LPARAM, RECT, WPARAM},
+        Foundation::{HWND, LPARAM, RECT},
         UI::WindowsAndMessaging::*,
         System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_FORMAT},
+        Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS},
     },
 };
 use std::mem;
 use std::time::Duration;
-use std::sync::{Arc, Mutex, OnceLock};
-use std::collections::HashSet;
 
 const DEBUG_SUBTAG: &str = "WINDOW_OPS";
 const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms smooth animation
@@ -41,6 +40,47 @@ fn force_set_pos(hwnd: HWND, rect: RECT) {
                 | SWP_ASYNCWINDOWPOS
                 | SWP_NOSENDCHANGING,
         );
+    }
+}
+
+/// Get the actual client-area aware rect accounting for DWM decorations
+/// Modern Windows apps have invisible shadows/borders that need to be accounted for
+fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT {
+    unsafe {
+        // Try to get DWM extended frame bounds (includes shadows)
+        let mut dwm_rect: RECT = std::mem::zeroed();
+        let has_dwm_frame = DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            &mut dwm_rect as *mut _ as _,
+            std::mem::size_of::<RECT>() as u32,
+        ).is_ok();
+
+        if has_dwm_frame && dwm_rect.left != 0 && dwm_rect.top != 0 {
+            // DWM frame exists - there are invisible decorations
+            // Measure the frame offset to compensate for shadows/borders
+            let mut client_rect: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut client_rect).is_ok() {
+                let frame_left = client_rect.left - dwm_rect.left;
+                let frame_top = client_rect.top - dwm_rect.top;
+                let frame_right = dwm_rect.right - client_rect.right;
+                let frame_bottom = dwm_rect.bottom - client_rect.bottom;
+                
+                // If there's a DWM frame (typically 8-10px shadow on modern Windows),
+                // compensate for it when gap=0 by overlapping slightly
+                if gap == 0 && (frame_left > 0 || frame_top > 0 || frame_right > 0 || frame_bottom > 0) {
+                    // Slightly overlap to account for invisible decorations
+                    return RECT {
+                        left: target.left.saturating_sub(frame_left / 2),
+                        top: target.top.saturating_sub(frame_top / 2),
+                        right: (target.right + frame_right / 2).min(client_rect.right + 1),
+                        bottom: (target.bottom + frame_bottom / 2).min(client_rect.bottom + 1),
+                    };
+                }
+            }
+        }
+        
+        target
     }
 }
 
@@ -349,6 +389,8 @@ pub fn apply_layout(
     let mut finals = Vec::new();
 
     unsafe {
+        let gap = config.gap.unwrap_or(10) as i32;
+        
         for (idx, window) in windows.iter().enumerate() {
             let target = layout_strategy.calculate_layout(
                 display,
@@ -362,11 +404,14 @@ pub fn apply_layout(
                 continue;
             }
 
-            if current != target {
-                animations.push((window.hwnd, current, target));
+            // Adjust target rect to account for DWM decorations/shadows on gap=0
+            let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target, gap);
+
+            if current != adjusted_target {
+                animations.push((window.hwnd, current, adjusted_target));
             }
 
-            finals.push((window.hwnd, target));
+            finals.push((window.hwnd, adjusted_target));
         }
     }
 
