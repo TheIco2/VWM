@@ -3,6 +3,8 @@
 
 use crate::types::{ManagerType, DisplayInfo, WindowManagerConfig};
 use windows::Win32::Foundation::RECT;
+use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
+
 
 #[derive(Debug, Clone)]
 pub struct WindowLayout {
@@ -136,6 +138,19 @@ impl BspNode {
 
 pub struct TilingLayout;
 
+fn monitor_work_area() -> RECT {
+    unsafe {
+        let mut rect: RECT = std::mem::zeroed();
+        SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            Some(&mut rect as *mut _ as _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        );
+        rect
+    }
+}
+
 impl LayoutStrategy for TilingLayout {
     fn calculate_layout(
         &self,
@@ -145,13 +160,13 @@ impl LayoutStrategy for TilingLayout {
         config: &WindowManagerConfig,
     ) -> RECT {
         let gap = config.gap.unwrap_or(10) as i32;
-        
-        // Build initial rectangle with gaps
+        let work = monitor_work_area();
+
         let initial_rect = RECT {
-            left: display.x + gap,
-            top: display.y + gap,
-            right: display.x + display.width - gap,
-            bottom: display.y + display.height - gap,
+            left: work.left + gap,
+            top: work.top + gap,
+            right: work.right - gap,
+            bottom: work.bottom - gap,
         };
 
         // Start with first window taking full space

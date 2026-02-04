@@ -1,4 +1,4 @@
-// ~/Sentinel/sentinel-addons/windowmanager/src/json.rs
+// ~/src/data_loaders/json.rs
 // TODO: Make this file a universal .json data loader.
 
 use std::{
