@@ -3,7 +3,6 @@
 
 use crate::types::{ManagerType, DisplayInfo, WindowManagerConfig};
 use windows::Win32::Foundation::RECT;
-use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
 
 
 // #[derive(Debug, Clone)]
@@ -132,19 +131,6 @@ impl BspNode {
 
 pub struct TilingLayout;
 
-fn monitor_work_area() -> RECT {
-    unsafe {
-        let mut rect: RECT = std::mem::zeroed();
-        let _ = SystemParametersInfoW(
-            SPI_GETWORKAREA,
-            0,
-            Some(&mut rect as *mut _ as _),
-            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        );
-        rect
-    }
-}
-
 impl LayoutStrategy for TilingLayout {
     fn calculate_layout(
         &self,
@@ -157,17 +143,13 @@ impl LayoutStrategy for TilingLayout {
             .and_then(|s| s.gap)
             .unwrap_or(10) as i32;
         
-        // Get the work area (excludes taskbar/status bar) and offset to the current monitor
-        let work_area = monitor_work_area();
-        let work_width = work_area.right - work_area.left;
-        let work_height = work_area.bottom - work_area.top;
-        
-        // Calculate the initial rect using work area dimensions offset to the display position
+        // Use the display's own dimensions for layout
+        // (monitor_work_area() only returns primary monitor's area, so we use display bounds directly)
         let initial_rect = RECT {
             left: display.x + gap,
             top: display.y + gap,
-            right: display.x + work_width - gap,
-            bottom: display.y + work_height - gap,
+            right: display.x + display.width - gap,
+            bottom: display.y + display.height - gap,
         };
 
         // Start with first window taking full space

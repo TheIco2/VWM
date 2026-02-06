@@ -16,6 +16,7 @@ mod data_loaders;
 use ipc_connector::request;
 use data_loaders::yaml::load_yaml;
 use types::{DisplayInfo, WindowManagerConfig};
+use config::UniversalConfig;
 use window_events::{EventManager, setup_event_hooks, cleanup_event_hooks, set_event_manager};
 use watchers::yaml_watcher;
 use utility::{_sentinel_addons_dir, _sentinel_assets_dir};
@@ -45,7 +46,13 @@ fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
         info!("[{}][IPC] Received IPC response, parsing JSON", DEBUG_NAME);
         // Try to parse the JSON response into Vec<DisplayInfo>
         match serde_json::from_str::<Vec<DisplayInfo>>(&resp) {
-            Ok(displays) => Some(displays),
+            Ok(displays) => {
+                for (idx, display) in displays.iter().enumerate() {
+                    info!("[{}][IPC] Display {}: pos=({},{}), size={}x{}, primary={}", 
+                          DEBUG_NAME, idx, display.x, display.y, display.width, display.height, display.primary);
+                }
+                Some(displays)
+            },
             Err(e) => {
                 error!("[{}][IPC] Failed to parse IPC response: {}", DEBUG_NAME, e);
                 None
@@ -177,6 +184,7 @@ fn main() -> windows::core::Result<()> {
     let mut debug_enabled = false;
     let mut log_level = "warn".to_string();
     let mut window_manager_config = WindowManagerConfig::default();
+    let mut universal_config = UniversalConfig::default();
     
     if let Some(addons_dir) = _sentinel_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
@@ -190,6 +198,14 @@ fn main() -> windows::core::Result<()> {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_lowercase())
                 .unwrap_or_else(|| if debug_enabled { "info".to_string() } else { "warn".to_string() });
+            
+            // Load universal configuration from YAML
+            if let Some(universal_value) = value.get("universal") {
+                if let Ok(config) = serde_yaml::from_value::<UniversalConfig>(universal_value.clone()) {
+                    universal_config = config;
+                    info!("[{}] Loaded universal config from YAML", DEBUG_NAME);
+                }
+            }
             
             // Load window manager configuration from YAML
             if let Some(wm_value) = value.get("window_manager") {
@@ -226,6 +242,29 @@ fn main() -> windows::core::Result<()> {
             }
 
             info!("[{}] Starting Window Manager for {} monitor(s)", DEBUG_NAME, monitors.len());
+
+            // Merge universal exclusions with window manager filters
+            if let Some(universal_excludes) = &universal_config.exclude_processes {
+                if let Some(filters) = &mut window_manager_config.filters {
+                    if let Some(wm_excludes) = &mut filters.exclude_processes {
+                        // Combine: start with universal, then add window-manager specific ones
+                        let mut combined = universal_excludes.clone();
+                        combined.extend(wm_excludes.iter().cloned());
+                        // Remove duplicates while preserving order
+                        combined.sort();
+                        combined.dedup();
+                        *wm_excludes = combined;
+                    } else {
+                        filters.exclude_processes = Some(universal_excludes.clone());
+                    }
+                } else {
+                    // Create filters with universal exclusions
+                    window_manager_config.filters = Some(crate::config::FiltersConfig {
+                        exclude_processes: Some(universal_excludes.clone()),
+                        ..Default::default()
+                    });
+                }
+            }
 
             // Use the loaded config for all monitors
             let mut configs = Vec::new();

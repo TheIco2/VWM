@@ -67,14 +67,12 @@ fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT
                 let frame_bottom = dwm_rect.bottom - client_rect.bottom;
                 
                 // If there's a DWM frame (typically 8-10px shadow on modern Windows),
-                // compensate for it when gap=0 by overlapping slightly
+                // compensate for it when gap=0 by overlapping fully so windows appear flush.
                 if gap == 0 && (frame_left > 0 || frame_top > 0 || frame_right > 0 || frame_bottom > 0) {
-                    // Overlap a portion of the DWM shadow so windows appear flush when `gap=0`.
-                    // Use half the detected frame to avoid over-extending into other areas.
-                    let adj_left = target.left.saturating_sub(frame_left / 2);
-                    let adj_top = target.top.saturating_sub(frame_top / 2);
-                    let adj_right = target.right.saturating_add(frame_right / 2);
-                    let adj_bottom = target.bottom.saturating_add(frame_bottom / 2);
+                    let adj_left = target.left.saturating_sub(frame_left);
+                    let adj_top = target.top.saturating_sub(frame_top);
+                    let adj_right = target.right.saturating_add(frame_right);
+                    let adj_bottom = target.bottom.saturating_add(frame_bottom);
 
                     return RECT {
                         left: adj_left,
