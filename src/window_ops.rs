@@ -303,12 +303,7 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<
         }
 
         let _ = EnumWindows(Some(enum_callback), LPARAM(&mut data as *mut _ as isize));
-        
-        // Sort windows by HWND (stable, persistent ID) to maintain consistent ordering
-        // This prevents focused windows from changing positions due to Z-order changes
-        // HWND is a stable handle that doesn't change when windows are focused
-        data.windows.sort_by_key(|w| w.hwnd.0 as isize);
-        
+                
         data.windows
     }
     .into_iter()
