@@ -161,8 +161,10 @@ impl LayoutStrategy for TilingLayout {
             .map(|g| &g.behavior)
             .unwrap_or(&GapBehavior::PerWindow);
 
-        // Edge gaps are always full gap (perimeter is not shared)
-        let edge_gap = gap;
+        let edge_gap = match behavior {
+            GapBehavior::PerWindow => gap,
+            GapBehavior::Shared => gap / 2,
+        };
 
         let initial_rect = RECT {
             left: display.x + edge_gap,
