@@ -3,7 +3,8 @@
 // Handles window enumeration, filtering, and positioning
 
 use crate::{info, DEBUG_NAME};
-use crate::types::{DisplayInfo, ManagedWindow, WindowFilters, WindowManagerConfig};
+use crate::types::{DisplayInfo, ManagedWindow, WindowManagerConfig};
+use crate::config::FiltersConfig;
 use crate::layout::LayoutStrategy;
 use windows::{
     core::{BOOL, PWSTR},
@@ -20,7 +21,6 @@ use std::time::Duration;
 const DEBUG_SUBTAG: &str = "WINDOW_OPS";
 const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms smooth animation
 const ANIMATION_FRAMES: u64 = 32;        // 16 frames @ ~60fps = ~267ms animation (smooth curve)
-const MIN_FRAME_DELAY_MS: u64 = 32;      // ~60fps timing, uses DeferWindowPos for atomicity
 
 #[inline]
 fn force_set_pos(hwnd: HWND, rect: RECT) {
@@ -56,7 +56,7 @@ fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT
             std::mem::size_of::<RECT>() as u32,
         ).is_ok();
 
-        if has_dwm_frame && dwm_rect.left != 0 && dwm_rect.top != 0 {
+        if has_dwm_frame {
             // DWM frame exists - there are invisible decorations
             // Measure the frame offset to compensate for shadows/borders
             let mut client_rect: RECT = std::mem::zeroed();
@@ -69,12 +69,18 @@ fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT
                 // If there's a DWM frame (typically 8-10px shadow on modern Windows),
                 // compensate for it when gap=0 by overlapping slightly
                 if gap == 0 && (frame_left > 0 || frame_top > 0 || frame_right > 0 || frame_bottom > 0) {
-                    // Slightly overlap to account for invisible decorations
+                    // Overlap a portion of the DWM shadow so windows appear flush when `gap=0`.
+                    // Use half the detected frame to avoid over-extending into other areas.
+                    let adj_left = target.left.saturating_sub(frame_left / 2);
+                    let adj_top = target.top.saturating_sub(frame_top / 2);
+                    let adj_right = target.right.saturating_add(frame_right / 2);
+                    let adj_bottom = target.bottom.saturating_add(frame_bottom / 2);
+
                     return RECT {
-                        left: target.left.saturating_sub(frame_left / 2),
-                        top: target.top.saturating_sub(frame_top / 2),
-                        right: (target.right + frame_right / 2).min(client_rect.right + 1),
-                        bottom: (target.bottom + frame_bottom / 2).min(client_rect.bottom + 1),
+                        left: adj_left,
+                        top: adj_top,
+                        right: adj_right,
+                        bottom: adj_bottom,
                     };
                 }
             }
@@ -141,7 +147,7 @@ pub fn get_process_name(hwnd: HWND) -> String {
 }
 
 /// Check if window should be managed based on filters
-pub fn should_manage_window(hwnd: HWND, filters: &WindowFilters) -> bool {
+pub fn should_manage_window(hwnd: HWND, filters: &FiltersConfig) -> bool {
     unsafe {
         // Check if window is visible
         if !IsWindowVisible(hwnd).as_bool() {
@@ -241,7 +247,7 @@ pub fn should_manage_window(hwnd: HWND, filters: &WindowFilters) -> bool {
 }
 
 /// Enumerate all manageable windows on a specific monitor
-pub fn enumerate_windows(display: &DisplayInfo, filters: &WindowFilters) -> Vec<ManagedWindow> {
+pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<ManagedWindow> {
     unsafe {
         let display_rect = RECT {
             left: display.x,
@@ -254,7 +260,7 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &WindowFilters) -> Vec<
         struct EnumData {
             windows: Vec<ManagedWindow>,
             display_rect: RECT,
-            filters: WindowFilters,
+            filters: FiltersConfig,
         }
 
         let mut data = EnumData {
@@ -321,13 +327,6 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &WindowFilters) -> Vec<
     .collect::<Vec<ManagedWindow>>()
 }
 
-/// Easing function for smooth animation (ease-out cubic)
-/// Returns a value from 0.0 to 1.0 based on progress (0.0 to 1.0)
-fn easing_ease_out_cubic(progress: f32) -> f32 {
-    let p = progress;
-    1.0 - (1.0 - p).powf(3.0)
-}
-
 /// Animate multiple windows synchronously using DeferWindowPos for atomic updates
 /// This keeps all windows in sync without race conditions or app crashes
 fn animate_windows_batched(
@@ -381,15 +380,20 @@ pub fn apply_layout(
     config: &WindowManagerConfig,
     layout_strategy: &dyn LayoutStrategy,
 ) {
-    let animation_enabled = config.animation_enabled.unwrap_or(false);
-    let animation_duration =
-        config.animation_duration_ms.unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
+    let animation_enabled = config.animation.as_ref()
+        .and_then(|a| a.enabled)
+        .unwrap_or(false);
+    let animation_duration = config.animation.as_ref()
+        .and_then(|a| a.duration)
+        .unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
 
     let mut animations = Vec::new();
     let mut finals = Vec::new();
 
     unsafe {
-        let gap = config.gap.unwrap_or(10) as i32;
+        let gap = config.styling.as_ref()
+            .and_then(|s| s.gap)
+            .unwrap_or(10) as i32;
         
         for (idx, window) in windows.iter().enumerate() {
             let target = layout_strategy.calculate_layout(
@@ -432,7 +436,8 @@ pub fn retile_windows(
     config: &WindowManagerConfig,
     layout_strategy: &dyn LayoutStrategy,
 ) {
-    let default_filters = WindowFilters::default();
+    use crate::config::FiltersConfig;
+    let default_filters = FiltersConfig::default();
     let filters = config.filters.as_ref().unwrap_or(&default_filters);
     let windows = enumerate_windows(display, filters);
 

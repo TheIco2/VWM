@@ -52,11 +52,6 @@ pub fn init(debug: bool, level: &str) {
 }
 
 #[inline]
-pub fn enabled() -> bool {
-    ENABLED.load(Ordering::Relaxed)
-}
-
-#[inline]
 pub fn should_log(level: &str) -> bool {
     if !ENABLED.load(Ordering::Relaxed) {
         return level == "WARN" || level == "ERROR";

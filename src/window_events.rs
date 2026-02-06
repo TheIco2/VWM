@@ -52,7 +52,8 @@ impl EventManager {
     pub fn new(monitors: Vec<DisplayInfo>, configs: Vec<WindowManagerConfig>) -> Self {
         let debounce_ms = configs
             .first()
-            .and_then(|config| config.debounce_ms)
+            .and_then(|config| config.events.as_ref())
+            .and_then(|e| e.debounce_ms)
             .unwrap_or(500);
         EventManager {
             monitors,

@@ -8,7 +8,7 @@ mod layout;
 mod types;
 mod window_ops;
 mod window_events;
-
+mod config;
 mod utility;
 mod watchers;
 mod data_loaders;
@@ -32,13 +32,6 @@ use windows::{
 
 pub const ADDON_NAME: &str = "windowmanager";
 pub const DEBUG_NAME: &str = "WINDOWMANAGER";
-
-/* ========================= APP STATE ========================= */
-#[derive(Clone)]
-struct AppState {
-    callback_msg: u32,
-    monitor: DisplayInfo,
-}
 
 // MonitorInfo and IpcMonitorsResponse moved to `src/types.rs`
 
@@ -76,28 +69,62 @@ fn check_config() {
             // Create default config.yaml
             let default_yaml = r#"update_check: true
 debug: false
+log_level: warn
 
 # Window Manager Configuration
+
+universal:
+  exclude_processes:
+    - "ShellExperienceHost.exe"
+    - "taskmgr.exe"
+    - "explorer.exe"
+    - "systemsettings.exe"
+    - "steamwebhelper.exe"
+    - "msiexec.exe"
+
 window_manager:
   enabled: true
-  manager_type: tiling  # Options: tiling, floating, stacking
-  animation_enabled: true           # Smooth synchronized animations using DeferWindowPos (no gray boxes)
-  animation_duration_ms: 300        # 300ms smooth animation with 16 frames
-  gap: 10               # Gap between windows in pixels
-  border_width: 2       # Border width in pixels
+  manager_type: tiling
+  monitor_index:
+    - "*"
+  animation:
+    enabled: true
+    duration: 150
+  styling:
+    gap: 10
+    border_width: 2
+  events:
+    debounce_ms: 500
   
   filters:
-    min_width: 200
-    min_height: 200
+    min_width: 1
+    min_height: 1
+    
+    include_processes: []
+
+    exclude_processes:
+      - "ShellExperienceHost.exe"
+      - "taskmgr.exe"
+      - "explorer.exe"
+      - "systemsettings.exe"
+      - "steamwebhelper.exe"
+      - "msiexec.exe"
+    
     exclude_classes:
-      - "Shell_TrayWnd"
-      - "Progman"
-      - "WorkerW"
+      - "Shell_TrayWnd"        
+      - "Progman"              
+      - "WorkerW"              
+      - "Windows.UI.Core"      
+      - "ApplicationFrameWindow"  
+    
     exclude_titles:
       - "Program Manager"
-    include_processes: []
-    exclude_processes:
-      - "explorer.exe""#;
+      - "NVIDIA GeForce Overlay"
+      - "Windows Input Experience"
+      - "Task Manager"
+      - "Settings"
+      - "PowerToys Quick Access"
+"#;
 
             if let Err(e) = std::fs::write(&yaml_path, default_yaml) {
                 error!("[{}] Failed to create default config.yaml: {}", DEBUG_NAME, e);
@@ -209,8 +236,8 @@ fn main() -> windows::core::Result<()> {
                 let manager_type = window_manager_config.manager_type.unwrap_or_default();
                 info!("[{}] Monitor {} using {} layout manager (debounce: {}ms, animation: {})", 
                       DEBUG_NAME, idx, manager_type, 
-                      window_manager_config.debounce_ms.unwrap_or(500),
-                      window_manager_config.animation_enabled.unwrap_or(true));
+                      window_manager_config.events.as_ref().and_then(|e| e.debounce_ms).unwrap_or(500),
+                      window_manager_config.animation.as_ref().and_then(|a| a.enabled).unwrap_or(true));
                 configs.push(window_manager_config.clone());
             }
 
@@ -243,7 +270,7 @@ fn main() -> windows::core::Result<()> {
                 break;
             }
 
-            TranslateMessage(&msg);
+            let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
 

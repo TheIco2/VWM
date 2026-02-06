@@ -1,5 +1,4 @@
 // ~/src/data_loaders/yaml.rs
-// TODO: Update this file to be a universal .yaml data loader.
 
 use std::{
     fs,
