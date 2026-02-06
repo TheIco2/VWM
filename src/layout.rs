@@ -1,14 +1,10 @@
+// ~/src/layout.rs
 // Layout Calculator Module for Positioning Windows
 // This module provides functions to calculate window layouts based on screen size and user preferences.
 
 use crate::types::{ManagerType, DisplayInfo, WindowManagerConfig};
+use crate::config::styling::GapBehavior;
 use windows::Win32::Foundation::RECT;
-
-
-// #[derive(Debug, Clone)]
-// pub struct WindowLayout {
-//     pub rect: RECT,
-// }
 
 pub trait LayoutStrategy {
     fn calculate_layout(
@@ -56,34 +52,45 @@ impl BspNode {
     }
 
     // Insert a new window by splitting the most recent leaf (last inserted window)
-    fn insert_window(&mut self, new_window_index: usize, gap: i32) {
+    fn insert_window(&mut self, new_window_index: usize, gap: i32, behavior: &GapBehavior) {
         let last_window_index = new_window_index - 1;
-        self.split_leaf_for_window(last_window_index, new_window_index, gap);
+        self.split_leaf_for_window(last_window_index, new_window_index, gap, behavior);
     }
 
-    fn split_leaf_for_window(&mut self, target_index: usize, new_window_index: usize, gap: i32) -> bool {
+
+    fn split_leaf_for_window(
+        &mut self,
+        target_index: usize,
+        new_window_index: usize,
+        gap: i32,
+        behavior: &GapBehavior,
+    ) -> bool {
         match self {
             BspNode::Leaf { window_index, rect } => {
                 if *window_index == target_index {
-                    // Found the leaf to split - decide direction based on aspect ratio
                     let width = rect.right - rect.left;
                     let height = rect.bottom - rect.top;
                     let split_vertical = width > height;
-                    let split_ratio = 0.5;
+
+                    let half = gap / 2;
 
                     if split_vertical {
-                        // Split left/right
-                        let split_x = rect.left + ((width as f32 * split_ratio) as i32);
-                        
+                        let split_x = rect.left + width / 2;
+
+                        let (left_gap, right_gap) = match behavior {
+                            GapBehavior::PerWindow => (gap, gap),
+                            GapBehavior::Shared => (half, half),
+                        };
+
                         let first_rect = RECT {
                             left: rect.left,
                             top: rect.top,
-                            right: split_x - gap / 2,
+                            right: split_x - right_gap,
                             bottom: rect.bottom,
                         };
-                        
+
                         let second_rect = RECT {
-                            left: split_x + gap / 2,
+                            left: split_x + left_gap,
                             top: rect.top,
                             right: rect.right,
                             bottom: rect.bottom,
@@ -94,19 +101,23 @@ impl BspNode {
                             second: Box::new(BspNode::new_leaf(new_window_index, second_rect)),
                         };
                     } else {
-                        // Split top/bottom
-                        let split_y = rect.top + ((height as f32 * split_ratio) as i32);
-                        
+                        let split_y = rect.top + height / 2;
+
+                        let (top_gap, bottom_gap) = match behavior {
+                            GapBehavior::PerWindow => (gap, gap),
+                            GapBehavior::Shared => (half, half),
+                        };
+
                         let first_rect = RECT {
                             left: rect.left,
                             top: rect.top,
                             right: rect.right,
-                            bottom: split_y - gap / 2,
+                            bottom: split_y - bottom_gap,
                         };
-                        
+
                         let second_rect = RECT {
                             left: rect.left,
-                            top: split_y + gap / 2,
+                            top: split_y + top_gap,
                             right: rect.right,
                             bottom: rect.bottom,
                         };
@@ -116,17 +127,19 @@ impl BspNode {
                             second: Box::new(BspNode::new_leaf(new_window_index, second_rect)),
                         };
                     }
+
                     true
                 } else {
                     false
                 }
             }
             BspNode::Split { first, second } => {
-                first.split_leaf_for_window(target_index, new_window_index, gap)
-                    || second.split_leaf_for_window(target_index, new_window_index, gap)
+                first.split_leaf_for_window(target_index, new_window_index, gap, behavior)
+                    || second.split_leaf_for_window(target_index, new_window_index, gap, behavior)
             }
         }
     }
+
 }
 
 pub struct TilingLayout;
@@ -138,29 +151,34 @@ impl LayoutStrategy for TilingLayout {
         window_count: usize,
         window_index: usize,
         config: &WindowManagerConfig,
-    ) -> RECT {
-        let gap = config.styling.as_ref()
-            .and_then(|s| s.gap)
-            .unwrap_or(10) as i32;
-        
-        // Use the display's own dimensions for layout
-        // (monitor_work_area() only returns primary monitor's area, so we use display bounds directly)
-        let initial_rect = RECT {
-            left: display.x + gap,
-            top: display.y + gap,
-            right: display.x + display.width - gap,
-            bottom: display.y + display.height - gap,
+    ) -> RECT {        
+        let gap_cfg = config.styling
+            .as_ref()
+            .and_then(|s| s.gap.as_ref());
+
+        let gap = gap_cfg.map(|g| g.space as i32).unwrap_or(0);
+        let behavior = gap_cfg
+            .map(|g| &g.behavior)
+            .unwrap_or(&GapBehavior::PerWindow);
+
+        let edge_gap = match behavior {
+            GapBehavior::PerWindow => gap,
+            GapBehavior::Shared => gap / 2,
         };
 
-        // Start with first window taking full space
+        let initial_rect = RECT {
+            left: display.x + edge_gap,
+            top: display.y + edge_gap,
+            right: display.x + display.width - edge_gap,
+            bottom: display.y + display.height - edge_gap,
+        };
+
         let mut root = BspNode::new_leaf(0, initial_rect);
 
-        // Insert each subsequent window by splitting the most recent leaf
         for i in 1..window_count {
-            root.insert_window(i, gap);
+            root.insert_window(i, gap, behavior);
         }
 
-        // Find and return the rect for the requested window
         root.find_leaf(window_index).unwrap_or(initial_rect)
     }
 }

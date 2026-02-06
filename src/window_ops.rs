@@ -47,47 +47,40 @@ fn force_set_pos(hwnd: HWND, rect: RECT) {
 /// Modern Windows apps have invisible shadows/borders that need to be accounted for
 fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT {
     unsafe {
-        // Try to get DWM extended frame bounds (includes shadows)
-        let mut dwm_rect: RECT = std::mem::zeroed();
-        let has_dwm_frame = DwmGetWindowAttribute(
+        if gap != 0 {
+            return target;
+        }
+
+        let mut win: RECT = std::mem::zeroed();
+        let mut dwm: RECT = std::mem::zeroed();
+
+        if GetWindowRect(hwnd, &mut win).is_err() {
+            return target;
+        }
+
+        if DwmGetWindowAttribute(
             hwnd,
             DWMWA_EXTENDED_FRAME_BOUNDS,
-            &mut dwm_rect as *mut _ as _,
+            &mut dwm as *mut _ as _,
             std::mem::size_of::<RECT>() as u32,
-        ).is_ok();
-
-        if has_dwm_frame {
-            // DWM frame exists - there are invisible decorations
-            // Measure the frame offset to compensate for shadows/borders
-            let mut client_rect: RECT = std::mem::zeroed();
-            if GetWindowRect(hwnd, &mut client_rect).is_ok() {
-                let frame_left = client_rect.left - dwm_rect.left;
-                let frame_top = client_rect.top - dwm_rect.top;
-                let frame_right = dwm_rect.right - client_rect.right;
-                let frame_bottom = dwm_rect.bottom - client_rect.bottom;
-                
-                // If there's a DWM frame (typically 8-10px shadow on modern Windows),
-                // compensate for it when gap=0 by overlapping fully so windows appear flush.
-                if gap == 0 && (frame_left > 0 || frame_top > 0 || frame_right > 0 || frame_bottom > 0) {
-                    let adj_left = target.left.saturating_sub(frame_left);
-                    let adj_top = target.top.saturating_sub(frame_top);
-                    let adj_right = target.right.saturating_add(frame_right);
-                    let adj_bottom = target.bottom.saturating_add(frame_bottom);
-
-                    return RECT {
-                        left: adj_left,
-                        top: adj_top,
-                        right: adj_right,
-                        bottom: adj_bottom,
-                    };
-                }
-            }
+        ).is_err() {
+            return target;
         }
-        
-        target
+
+        // Correct resize border math
+        let border_left   = dwm.left   - win.left;
+        let border_top    = dwm.top    - win.top;
+        let border_right  = win.right  - dwm.right;
+        let border_bottom = win.bottom - dwm.bottom;
+
+        RECT {
+            left:   target.left   - border_left,
+            top:    target.top    - border_top,
+            right:  target.right  + border_right,
+            bottom: target.bottom + border_bottom,
+        }
     }
 }
-
 
 /// Get window title
 pub fn get_window_title(hwnd: HWND) -> String {
@@ -385,14 +378,16 @@ pub fn apply_layout(
         .and_then(|a| a.duration)
         .unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
 
+    let gap = config.styling
+        .as_ref()
+        .and_then(|s| s.gap.as_ref())
+        .map(|g| g.space as i32)
+        .unwrap_or(0);
+
     let mut animations = Vec::new();
     let mut finals = Vec::new();
 
-    unsafe {
-        let gap = config.styling.as_ref()
-            .and_then(|s| s.gap)
-            .unwrap_or(10) as i32;
-        
+    unsafe {        
         for (idx, window) in windows.iter().enumerate() {
             let target = layout_strategy.calculate_layout(
                 display,
@@ -406,7 +401,6 @@ pub fn apply_layout(
                 continue;
             }
 
-            // Adjust target rect to account for DWM decorations/shadows on gap=0
             let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target, gap);
 
             if current != adjusted_target {
