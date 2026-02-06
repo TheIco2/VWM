@@ -19,7 +19,7 @@ use windows::{
 
 use crate::{
     info, warn, error,
-    utility::_to_wstring,
+    utility::to_wstring,
     DEBUG_NAME,
 };
 
@@ -33,7 +33,7 @@ pub struct IpcResponse {
 /// Sends a JSON IPC request to the Sentinel IPC server and returns the universal IpcResponse.
 fn send_ipc_request(req: &Value) -> Option<IpcResponse> {
     unsafe {
-        let name = _to_wstring(r"\\.\pipe\sentinel");
+        let name = to_wstring(r"\\.\pipe\sentinel");
         let pipe_name = PCWSTR(name.as_ptr());
 
         // Wait for server

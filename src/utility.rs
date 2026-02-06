@@ -2,7 +2,7 @@
 // --------------------------------
 
 // Utility function to convert &str to wide string (Vec<u16>)
-pub fn _to_wstring(s: &str) -> Vec<u16> {
+pub fn to_wstring(s: &str) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
     std::ffi::OsStr::new(s)
         .encode_wide()
@@ -11,7 +11,7 @@ pub fn _to_wstring(s: &str) -> Vec<u16> {
 }
 
 // Utility function to convert wide string (slice of u16) to String
-pub fn _from_wstring(ws: &[u16]) -> String {
+pub fn from_wstring(ws: &[u16]) -> String {
     use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
     let len = ws.iter().position(|&c| c == 0).unwrap_or(ws.len());
@@ -25,22 +25,22 @@ pub fn _from_wstring(ws: &[u16]) -> String {
 // --------------------------------
 
 // Get user home directory
-pub fn _user_home_dir() -> Option<std::path::PathBuf> {
+pub fn user_home_dir() -> Option<std::path::PathBuf> {
     std::env::var("USERPROFILE").map(std::path::PathBuf::from).ok()
 }
 
 // Get Sentinel Root Directory
-pub fn _sentinel_root_dir() -> Option<std::path::PathBuf> {
-    _user_home_dir().map(|p| p.join(".Sentinel"))
+pub fn sentinel_root_dir() -> Option<std::path::PathBuf> {
+    user_home_dir().map(|p| p.join(".Sentinel"))
 }
 
 // Get Sentinel Addons Directory
-pub fn _sentinel_addons_dir() -> Option<std::path::PathBuf> {
-    _sentinel_root_dir().map(|p| p.join("Addons"))
+pub fn sentinel_addons_dir() -> Option<std::path::PathBuf> {
+    sentinel_root_dir().map(|p| p.join("Addons"))
 }
 
 // Get Sentinel Assets Directory
-pub fn _sentinel_assets_dir() -> Option<std::path::PathBuf> {
-    _sentinel_root_dir().map(|p| p.join("Assets"))
+pub fn sentinel_assets_dir() -> Option<std::path::PathBuf> {
+    sentinel_root_dir().map(|p| p.join("Assets"))
 }
 // --------------------------------

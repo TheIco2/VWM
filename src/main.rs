@@ -19,7 +19,7 @@ use types::{DisplayInfo, WindowManagerConfig};
 use config::UniversalConfig;
 use window_events::{EventManager, setup_event_hooks, cleanup_event_hooks, set_event_manager};
 use watchers::yaml_watcher;
-use utility::{_sentinel_addons_dir, _sentinel_assets_dir};
+use utility::{sentinel_addons_dir, sentinel_assets_dir};
 
 use windows::{
     Win32::{
@@ -69,7 +69,7 @@ fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
    ========================= */
 fn check_config() {
     // Checks if config.yaml at '~/.Sentinel/addons/<addon>/' exists, if not create default
-    if let Some(addons_dir) = _sentinel_addons_dir() {
+    if let Some(addons_dir) = sentinel_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
         if !yaml_path.exists() {
             info!("[{}] No config.yaml found for Window Manager, creating default", DEBUG_NAME);
@@ -98,8 +98,9 @@ window_manager:
     enabled: true
     duration: 150
   styling:
-    gap: 10
-    border_width: 2
+    gap:
+      space: 5
+      behavior: "Shared"
   events:
     debounce_ms: 500
   
@@ -148,7 +149,7 @@ window_manager:
 
 fn check_assets() {
     // Check if assets directory '~/.Sentinel/Assets/windowmanager' exists
-    if let Some(assets_dir) = _sentinel_assets_dir() {
+    if let Some(assets_dir) = sentinel_assets_dir() {
         let assets_dir = assets_dir.join(ADDON_NAME);
         if !assets_dir.exists() {
             info!("[{}] No assets directory found for Window Manager, creating default", DEBUG_NAME);
@@ -168,7 +169,6 @@ fn check_assets() {
 
 pub fn initial_startup() {
     info!("[{}] Performing initial startup tasks", DEBUG_NAME);
-
     // Check and create config.yaml if missing
     check_config();
     // Check and create assets directory if missing
@@ -186,7 +186,7 @@ fn main() -> windows::core::Result<()> {
     let mut window_manager_config = WindowManagerConfig::default();
     let mut universal_config = UniversalConfig::default();
     
-    if let Some(addons_dir) = _sentinel_addons_dir() {
+    if let Some(addons_dir) = sentinel_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
         if let Some(value) = load_yaml(&yaml_path) {
             debug_enabled = value
@@ -289,7 +289,7 @@ fn main() -> windows::core::Result<()> {
             info!("[{}] Window Manager disabled in config - staying idle", DEBUG_NAME);
         }
 
-        if let Some(addons_dir) = _sentinel_addons_dir() {
+        if let Some(addons_dir) = sentinel_addons_dir() {
             let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
             yaml_watcher(&yaml_dir, || true);
         } else {

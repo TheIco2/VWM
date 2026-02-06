@@ -6,6 +6,7 @@ use crate::{info, DEBUG_NAME};
 use crate::types::{DisplayInfo, ManagedWindow, WindowManagerConfig};
 use crate::config::FiltersConfig;
 use crate::layout::LayoutStrategy;
+
 use windows::{
     core::{BOOL, PWSTR},
     Win32::{
@@ -45,12 +46,8 @@ fn force_set_pos(hwnd: HWND, rect: RECT) {
 
 /// Get the actual client-area aware rect accounting for DWM decorations
 /// Modern Windows apps have invisible shadows/borders that need to be accounted for
-fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT, gap: i32) -> RECT {
+fn get_adjusted_rect_for_positioning(hwnd: HWND, target: RECT) -> RECT {
     unsafe {
-        if gap != 0 {
-            return target;
-        }
-
         let mut win: RECT = std::mem::zeroed();
         let mut dwm: RECT = std::mem::zeroed();
 
@@ -378,12 +375,6 @@ pub fn apply_layout(
         .and_then(|a| a.duration)
         .unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
 
-    let gap = config.styling
-        .as_ref()
-        .and_then(|s| s.gap.as_ref())
-        .map(|g| g.space as i32)
-        .unwrap_or(0);
-
     let mut animations = Vec::new();
     let mut finals = Vec::new();
 
@@ -401,7 +392,7 @@ pub fn apply_layout(
                 continue;
             }
 
-            let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target, gap);
+            let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target);
 
             if current != adjusted_target {
                 animations.push((window.hwnd, current, adjusted_target));
@@ -413,12 +404,11 @@ pub fn apply_layout(
 
     if animation_enabled && !animations.is_empty() {
         animate_windows_batched(&animations, animation_duration);
-        return;
-    }
-
-    // Instant layout — FORCE, no defer, no negotiation
-    for (hwnd, rect) in finals {
-        force_set_pos(hwnd, rect);
+    } else {
+        // Instant layout — FORCE, no defer, no negotiation
+        for (hwnd, rect) in finals {
+            force_set_pos(hwnd, rect);
+        }
     }
 }
 

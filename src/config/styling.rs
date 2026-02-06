@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StylingConfig {
     pub gap: Option<GapConfig>,
-    pub border_width: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -15,7 +14,9 @@ pub struct GapConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GapBehavior {
+    #[serde(alias = "PerWindow", alias = "perwindow", alias = "PERWINDOW", alias = "Per_Window", alias = "per_window")]
     PerWindow,
+    #[serde(alias = "Shared", alias = "shared", alias = "SHARED")]
     Shared,
 }
 
@@ -26,7 +27,6 @@ impl Default for StylingConfig {
                 space: 10,
                 behavior: GapBehavior::PerWindow,
             }),
-            border_width: Some(2),
         }
     }
 }

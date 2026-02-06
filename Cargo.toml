@@ -8,7 +8,6 @@ license = "UNLICENSED"
 publish = false
 
 [dependencies]
-windows-core = "0.62.2"
 windows = { version = "0.62.2", features = [
     "Win32",
     "Win32_Foundation",
