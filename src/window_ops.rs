@@ -19,6 +19,12 @@ use windows::{
 use std::mem;
 use std::time::Duration;
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+
+pub static BSP_STATE: OnceLock<Arc<Mutex<HashMap<String, Vec<isize>>>>> = OnceLock::new();
+
+
 const DEBUG_SUBTAG: &str = "WINDOW_OPS";
 const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms smooth animation
 const ANIMATION_FRAMES: u64 = 32;        // 16 frames @ ~60fps = ~267ms animation (smooth curve)
@@ -234,8 +240,7 @@ pub fn should_manage_window(hwnd: HWND, filters: &FiltersConfig) -> bool {
     }
 }
 
-/// Enumerate all manageable windows on a specific monitor
-pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<ManagedWindow> {
+fn enumerate_windows_raw(display: &DisplayInfo, all_displays: &[DisplayInfo], filters: &FiltersConfig) -> Vec<ManagedWindow> {
     unsafe {
         let display_rect = RECT {
             left: display.x,
@@ -244,17 +249,31 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<
             bottom: display.y + display.height,
         };
 
+        // Check for adjacent monitors on each side
+        let has_left = all_displays.iter().any(|d| d.x + d.width == display.x);
+        let has_right = all_displays.iter().any(|d| d.x == display.x + display.width);
+        let has_top = all_displays.iter().any(|d| d.y + d.height == display.y);
+        let has_bottom = all_displays.iter().any(|d| d.y == display.y + display.height);
+
         // Callback data structure
         struct EnumData {
             windows: Vec<ManagedWindow>,
             display_rect: RECT,
             filters: FiltersConfig,
+            has_left: bool,
+            has_right: bool,
+            has_top: bool,
+            has_bottom: bool,
         }
 
         let mut data = EnumData {
             windows: Vec::new(),
             display_rect,
             filters: filters.clone(),
+            has_left,
+            has_right,
+            has_top,
+            has_bottom,
         };
 
         unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -280,14 +299,40 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<
                 return true.into();
             }
 
-            // Check if window is on this monitor (at least partially)
-            let window_center_x = (rect.left + rect.right) / 2;
-            let window_center_y = (rect.top + rect.bottom) / 2;
-            
-            if window_center_x >= data.display_rect.left 
-                && window_center_x < data.display_rect.right
-                && window_center_y >= data.display_rect.top
-                && window_center_y < data.display_rect.bottom {
+            // Apply 50% threshold only on sides with adjacent monitors
+            let inter_left = rect.left.max(data.display_rect.left);
+            let inter_top = rect.top.max(data.display_rect.top);
+            let inter_right = rect.right.min(data.display_rect.right);
+            let inter_bottom = rect.bottom.min(data.display_rect.bottom);
+
+            if inter_right <= inter_left || inter_bottom <= inter_top {
+                return true.into();
+            }
+
+            let window_width = (rect.right - rect.left) as i64;
+            let window_height = (rect.bottom - rect.top) as i64;
+            let inter_width = (inter_right - inter_left) as i64;
+            let inter_height = (inter_bottom - inter_top) as i64;
+
+            // Check horizontal constraint
+            let h_ok = if data.has_left && rect.left < data.display_rect.left {
+                inter_width * 100 >= window_width * 50
+            } else if data.has_right && rect.right > data.display_rect.right {
+                inter_width * 100 >= window_width * 50
+            } else {
+                true
+            };
+
+            // Check vertical constraint
+            let v_ok = if data.has_top && rect.top < data.display_rect.top {
+                inter_height * 100 >= window_height * 50
+            } else if data.has_bottom && rect.bottom > data.display_rect.bottom {
+                inter_height * 100 >= window_height * 50
+            } else {
+                true
+            };
+
+            if h_ok && v_ok {
                 
                 let managed_window = ManagedWindow {
                     hwnd,
@@ -303,11 +348,152 @@ pub fn enumerate_windows(display: &DisplayInfo, filters: &FiltersConfig) -> Vec<
         }
 
         let _ = EnumWindows(Some(enum_callback), LPARAM(&mut data as *mut _ as isize));
-                
         data.windows
     }
-    .into_iter()
-    .collect::<Vec<ManagedWindow>>()
+}
+
+fn sort_windows_by_position(windows: &mut Vec<ManagedWindow>, order: Option<&Vec<isize>>) {
+    windows.sort_by(|a, b| unsafe {
+        let mut rect_a: RECT = mem::zeroed();
+        let mut rect_b: RECT = mem::zeroed();
+        let ok_a = GetWindowRect(a.hwnd, &mut rect_a).is_ok();
+        let ok_b = GetWindowRect(b.hwnd, &mut rect_b).is_ok();
+
+        let (ay, ax) = if ok_a {
+            ((rect_a.top + rect_a.bottom) / 2, (rect_a.left + rect_a.right) / 2)
+        } else {
+            (i32::MAX, i32::MAX)
+        };
+        let (by, bx) = if ok_b {
+            ((rect_b.top + rect_b.bottom) / 2, (rect_b.left + rect_b.right) / 2)
+        } else {
+            (i32::MAX, i32::MAX)
+        };
+
+        let pos_cmp = ay.cmp(&by).then(ax.cmp(&bx));
+        if pos_cmp != std::cmp::Ordering::Equal {
+            return pos_cmp;
+        }
+
+        if let Some(order) = order {
+            let a_idx = order.iter().position(|h| *h == a.hwnd.0 as isize).unwrap_or(usize::MAX);
+            let b_idx = order.iter().position(|h| *h == b.hwnd.0 as isize).unwrap_or(usize::MAX);
+            let order_cmp = a_idx.cmp(&b_idx);
+            if order_cmp != std::cmp::Ordering::Equal {
+                return order_cmp;
+            }
+        }
+
+        (a.hwnd.0 as isize).cmp(&(b.hwnd.0 as isize))
+    });
+}
+
+pub fn get_window_order_by_position(display: &DisplayInfo, all_displays: &[DisplayInfo], filters: &FiltersConfig) -> Vec<isize> {
+    let mut windows = enumerate_windows_raw(display, all_displays, filters);
+    sort_windows_by_position(&mut windows, None);
+    windows.into_iter().map(|w| w.hwnd.0 as isize).collect()
+}
+
+pub fn swap_window_order_by_drop(
+    display: &DisplayInfo,
+    all_displays: &[DisplayInfo],
+    filters: &FiltersConfig,
+    moved_hwnd: HWND,
+    order: &mut Vec<isize>,
+) -> bool {
+    let hwnd_val = moved_hwnd.0 as isize;
+    if order.len() < 2 {
+        return false;
+    }
+
+    let moved_rect = unsafe {
+        let mut rect: RECT = mem::zeroed();
+        if GetWindowRect(moved_hwnd, &mut rect).is_ok() {
+            Some(rect)
+        } else {
+            None
+        }
+    };
+    let Some(moved_rect) = moved_rect else { return false; };
+
+    let center_x = (moved_rect.left + moved_rect.right) / 2;
+    let center_y = (moved_rect.top + moved_rect.bottom) / 2;
+
+    let windows = enumerate_windows_raw(display, all_displays, filters);
+    let mut target_hwnd: Option<isize> = None;
+
+    for w in windows {
+        if w.hwnd == moved_hwnd {
+            continue;
+        }
+
+        let mut rect: RECT = unsafe { mem::zeroed() };
+        if unsafe { GetWindowRect(w.hwnd, &mut rect).is_err() } {
+            continue;
+        }
+
+        if center_x >= rect.left && center_x < rect.right && center_y >= rect.top && center_y < rect.bottom {
+            target_hwnd = Some(w.hwnd.0 as isize);
+            break;
+        }
+    }
+
+    let Some(target_hwnd) = target_hwnd else { return false; };
+    if target_hwnd == hwnd_val {
+        return false;
+    }
+
+    let pos_a = order.iter().position(|h| *h == hwnd_val);
+    let pos_b = order.iter().position(|h| *h == target_hwnd);
+    if let (Some(a), Some(b)) = (pos_a, pos_b) {
+        order.swap(a, b);
+        return true;
+    }
+
+    false
+}
+
+pub fn enumerate_windows_with_all(display: &DisplayInfo, all_displays: &[DisplayInfo], filters: &FiltersConfig) -> Vec<ManagedWindow> {
+    let managed_windows_list = enumerate_windows_raw(display, all_displays, filters);
+
+    // ---------------- BSP ORDER PERSISTENCE ----------------
+    let state = BSP_STATE
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone();
+
+    let mut state_map = state.lock().unwrap();
+    let order = state_map
+        .entry(display.id.clone())
+        .or_insert_with(Vec::new);
+    let mut result = managed_windows_list;
+    let mut position_sorted = result.clone();
+    sort_windows_by_position(&mut position_sorted, Some(order));
+
+    if order.is_empty() {
+        order.extend(position_sorted.iter().map(|w| w.hwnd.0 as isize));
+    }
+
+    // Add new windows to persistent order
+    for w in &position_sorted {
+        let hwnd_val = w.hwnd.0 as isize;
+        if !order.contains(&hwnd_val) {
+            order.push(hwnd_val);
+        }
+    }
+
+    // Remove windows that no longer exist
+    order.retain(|h| result.iter().any(|w| w.hwnd.0 as isize == *h));
+
+    // Sort windows by persistent BSP order
+    result.sort_by_key(|w| {
+        order
+            .iter()
+            .position(|h| *h == w.hwnd.0 as isize)
+            .unwrap_or(usize::MAX)
+    });
+    // -------------------------------------------------------
+
+    result
 }
 
 /// Animate multiple windows synchronously using DeferWindowPos for atomic updates
@@ -410,13 +596,14 @@ pub fn apply_layout(
 /// Retile all windows on a monitor
 pub fn retile_windows(
     display: &DisplayInfo,
+    all_displays: &[DisplayInfo],
     config: &WindowManagerConfig,
     layout_strategy: &dyn LayoutStrategy,
 ) {
     use crate::config::FiltersConfig;
     let default_filters = FiltersConfig::default();
     let filters = config.filters.as_ref().unwrap_or(&default_filters);
-    let windows = enumerate_windows(display, filters);
+    let windows = enumerate_windows_with_all(display, all_displays, filters);
 
     if windows.is_empty() {
         info!("[{}][{}] No windows to tile", DEBUG_NAME, DEBUG_SUBTAG);

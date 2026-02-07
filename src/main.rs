@@ -34,8 +34,6 @@ use windows::{
 pub const ADDON_NAME: &str = "windowmanager";
 pub const DEBUG_NAME: &str = "WINDOWMANAGER";
 
-// MonitorInfo and IpcMonitorsResponse moved to `src/types.rs`
-
 /* =========================
    IPC MONITORS
    ========================= */

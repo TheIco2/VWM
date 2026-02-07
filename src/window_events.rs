@@ -4,6 +4,7 @@
 
 use crate::{info, DEBUG_NAME};
 use crate::types::{DisplayInfo, WindowManagerConfig};
+use crate::config::FiltersConfig;
 use crate::layout::get_layout_strategy;
 use crate::window_ops::retile_windows;
 
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use windows::{
     Win32::{
-        Foundation::HWND,
+        Foundation::{HWND, RECT},
         UI::{
             Accessibility::*,
             WindowsAndMessaging::*,
@@ -161,7 +162,7 @@ impl EventManager {
                 if config.enabled {
                     let manager_type = config.manager_type.unwrap_or_default();
                     let layout = get_layout_strategy(manager_type);
-                    retile_windows(monitor, config, layout.as_ref());
+                    retile_windows(monitor, &monitors, config, layout.as_ref());
                 }
             }
 
@@ -228,8 +229,62 @@ unsafe extern "system" fn win_event_proc(
 
         EVENT_SYSTEM_MOVESIZEEND => {
             manager.mark_window_dragging(hwnd, false);
-            // Do nothing. Respect manual move.
+            unsafe {
+                let mut rect: RECT = std::mem::zeroed();
+                if GetWindowRect(hwnd, &mut rect).is_err() {
+                    return;
+                }
+
+                let mut best: Option<(&DisplayInfo, &WindowManagerConfig, i64)> = None;
+
+                for (monitor, config) in manager.monitors.iter().zip(manager.configs.iter()) {
+                    let inter_left = rect.left.max(monitor.x);
+                    let inter_top = rect.top.max(monitor.y);
+                    let inter_right = rect.right.min(monitor.x + monitor.width);
+                    let inter_bottom = rect.bottom.min(monitor.y + monitor.height);
+
+                    let area = if inter_right > inter_left && inter_bottom > inter_top {
+                        (inter_right - inter_left) as i64 * (inter_bottom - inter_top) as i64
+                    } else {
+                        0
+                    };
+
+                    if area > 0 {
+                        if best.map_or(true, |(_, _, best_area)| area > best_area) {
+                            best = Some((monitor, config, area));
+                        }
+                    }
+                }
+
+                if let Some((monitor, config, _)) = best {
+                    if config.enabled {
+                        let default_filters = FiltersConfig::default();
+                        let filters = config.filters.as_ref().unwrap_or(&default_filters);
+
+                        let state = crate::window_ops::BSP_STATE
+                            .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+                            .clone();
+                        let mut state_map = state.lock().unwrap();
+                        let order = state_map.entry(monitor.id.clone()).or_insert_with(Vec::new);
+
+                        let swapped = crate::window_ops::swap_window_order_by_drop(
+                            monitor,
+                            &manager.monitors,
+                            filters,
+                            hwnd,
+                            order,
+                        );
+
+                        if !swapped && order.is_empty() {
+                            *order = crate::window_ops::get_window_order_by_position(monitor, &manager.monitors, filters);
+                        }
+                    }
+                }
+            }
+
+            manager.schedule_retile();
         }
+
 
         _ => {}
     }

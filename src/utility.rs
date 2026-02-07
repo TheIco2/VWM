@@ -11,7 +11,7 @@ pub fn to_wstring(s: &str) -> Vec<u16> {
 }
 
 // Utility function to convert wide string (slice of u16) to String
-pub fn from_wstring(ws: &[u16]) -> String {
+pub fn _from_wstring(ws: &[u16]) -> String {
     use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
     let len = ws.iter().position(|&c| c == 0).unwrap_or(ws.len());
