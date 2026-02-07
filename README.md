@@ -19,11 +19,11 @@ The window manager supports three distinct layout modes:
 - **Position-based window ordering** - windows maintain stable positions based on their screen coordinates
 - **Drag-to-reorder** - physically drag windows to reposition them in the layout order
   - Swap functionality: dragging a window onto another window's position swaps their order
-  - No focus-based reordering - windows stay where you place them
+  - Order is determined by position and drag actions
 - **Per-monitor BSP state** - each monitor maintains its own independent window order
-- **Smart monitor boundary detection** - prevents windows from jumping between monitors during drag operations
-  - 50% overlap threshold on adjacent monitor edges prevents cross-monitor swapping
-  - Any intersection allowed on isolated edges for flexible positioning
+- **Smart monitor boundary detection** - keeps windows assigned to the intended monitor during drag operations
+  - 50% overlap threshold on adjacent monitor edges governs cross-monitor swaps
+  - Flexible positioning on isolated edges
 - **Edge‑drag resizing** - resize any tiled window by dragging its edges
   - Neighboring windows adjust along shared boundaries
   - Resizes persist and the BSP layout respects updated boundaries
@@ -31,7 +31,6 @@ The window manager supports three distinct layout modes:
 #### 2. **Floating Layout**
 
 - Windows retain their natural positions
-- No automatic repositioning
 - Useful for non-tiled workflows
 
 #### 3. **Stacking Layout**
@@ -52,7 +51,7 @@ Smooth, configurable animations when windows are repositioned:
 
 - **Direct edge dragging** in tiling mode
 - **Boundary-aware propagation** to adjacent windows
-- **Persistent layout updates** so the BSP layout does not snap back
+- **Persistent layout updates** so the BSP layout respects resize adjustments
 
 ### Gap Management
 
@@ -97,7 +96,7 @@ Comprehensive filtering system to control which windows are managed:
 
 ### Automatic Filters
 
-The window manager automatically excludes:
+The window manager automatically filters:
 
 - Invisible windows
 - Minimized windows
@@ -119,8 +118,8 @@ Full multi-monitor capability:
 - **Independent BSP state** - Each monitor maintains its own window order
 - **Intelligent monitor assignment** - Windows are assigned to monitors based on intersection area
 - **Smart boundary detection** - Detects which monitor edges have adjacent monitors
-  - Prevents accidental cross-monitor window jumping
-  - Allows windows to extend beyond isolated edges without losing management
+  - Keeps windows aligned with their assigned monitor boundaries
+  - Supports flexible placement on isolated edges
 - **Dynamic monitor topology** - Automatically adapts to display configuration changes
 
 ### Window Events
