@@ -1,8 +1,10 @@
 # Tiling Window Manager
 
-A dynamic, multi-monitor window management addon for Sentinel that provides automatic window tiling, positioning, and organization with extensive customization options.
+**Dynamic, multi-monitor window management** for Sentinel — fast tiling, clean gaps, smooth animations, and now **edge‑drag resizing** that the BSP layout respects.
 
 ## Features
+
+> A modern tiling workflow with predictable placement, clean spacing, and configurable behavior per monitor.
 
 ### Layout Managers
 
@@ -22,6 +24,9 @@ The window manager supports three distinct layout modes:
 - **Smart monitor boundary detection** - prevents windows from jumping between monitors during drag operations
   - 50% overlap threshold on adjacent monitor edges prevents cross-monitor swapping
   - Any intersection allowed on isolated edges for flexible positioning
+- **Edge‑drag resizing** - resize any tiled window by dragging its edges
+  - Neighboring windows adjust along shared boundaries
+  - Resizes persist and the BSP layout respects updated boundaries
 
 #### 2. **Floating Layout**
 
@@ -42,6 +47,12 @@ Smooth, configurable animations when windows are repositioned:
 - **Toggle animations** on/off per configuration
 - **Configurable duration** (default: 150ms)
 - Native Windows animation support via `SetWindowPos` with `SWP_ASYNCWINDOWPOS`
+
+### Resizing
+
+- **Direct edge dragging** in tiling mode
+- **Boundary-aware propagation** to adjacent windows
+- **Persistent layout updates** so the BSP layout does not snap back
 
 ### Gap Management
 
@@ -178,6 +189,8 @@ window_manager:
       - "Shell_TrayWnd"
     exclude_titles:
       - "Task Manager"
+
+  # Resizing is enabled automatically in tiling mode
 ```
 
 ## Architecture
