@@ -261,6 +261,22 @@ unsafe extern "system" fn win_event_proc(
                         let default_filters = FiltersConfig::default();
                         let filters = config.filters.as_ref().unwrap_or(&default_filters);
 
+                        let manager_type = config.manager_type.unwrap_or_default();
+                        let layout = get_layout_strategy(manager_type);
+
+                        let resized = crate::window_ops::update_resize_state_for_window(
+                            monitor,
+                            &manager.monitors,
+                            config,
+                            layout.as_ref(),
+                            hwnd,
+                        );
+
+                        if resized {
+                            manager.schedule_retile();
+                            return;
+                        }
+
                         let state = crate::window_ops::BSP_STATE
                             .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
                             .clone();

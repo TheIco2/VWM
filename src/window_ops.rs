@@ -3,8 +3,9 @@
 // Handles window enumeration, filtering, and positioning
 
 use crate::{info, DEBUG_NAME};
-use crate::types::{DisplayInfo, ManagedWindow, WindowManagerConfig};
+use crate::types::{DisplayInfo, ManagedWindow, WindowManagerConfig, ManagerType};
 use crate::config::FiltersConfig;
+use crate::config::styling::GapBehavior;
 use crate::layout::LayoutStrategy;
 
 use windows::{
@@ -23,11 +24,21 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
 pub static BSP_STATE: OnceLock<Arc<Mutex<HashMap<String, Vec<isize>>>>> = OnceLock::new();
+pub static RESIZE_STATE: OnceLock<Arc<Mutex<HashMap<String, HashMap<isize, ResizeIntent>>>>> = OnceLock::new();
 
 
 const DEBUG_SUBTAG: &str = "WINDOW_OPS";
 const DEFAULT_ANIMATION_DURATION_MS: u64 = 300;  // 300ms smooth animation
 const ANIMATION_FRAMES: u64 = 32;        // 16 frames @ ~60fps = ~267ms animation (smooth curve)
+const EDGE_TOLERANCE: i32 = 2;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ResizeIntent {
+    pub left: Option<i32>,
+    pub right: Option<i32>,
+    pub top: Option<i32>,
+    pub bottom: Option<i32>,
+}
 
 #[inline]
 fn force_set_pos(hwnd: HWND, rect: RECT) {
@@ -506,6 +517,394 @@ pub fn enumerate_windows_with_all(display: &DisplayInfo, all_displays: &[Display
     result
 }
 
+fn get_layout_bounds(display: &DisplayInfo, config: &WindowManagerConfig) -> RECT {
+    let mut left = display.x;
+    let mut top = display.y;
+    let mut right = display.x + display.width;
+    let mut bottom = display.y + display.height;
+
+    if config.manager_type.unwrap_or_default() == ManagerType::Tiling {
+        let gap_cfg = config.styling.as_ref().and_then(|s| s.gap.as_ref());
+        let gap = gap_cfg.map(|g| g.space as i32).unwrap_or(0);
+        let behavior = gap_cfg
+            .map(|g| &g.behavior)
+            .unwrap_or(&GapBehavior::PerWindow);
+
+        let edge_gap = match behavior {
+            GapBehavior::PerWindow => gap,
+            GapBehavior::Shared => gap / 2,
+        };
+
+        left += edge_gap;
+        top += edge_gap;
+        right -= edge_gap;
+        bottom -= edge_gap;
+    }
+
+    RECT {
+        left,
+        top,
+        right,
+        bottom,
+    }
+}
+
+fn get_internal_gap(config: &WindowManagerConfig) -> i32 {
+    let gap_cfg = config.styling.as_ref().and_then(|s| s.gap.as_ref());
+    let gap = gap_cfg.map(|g| g.space as i32).unwrap_or(0);
+    let behavior = gap_cfg
+        .map(|g| &g.behavior)
+        .unwrap_or(&GapBehavior::PerWindow);
+
+    match behavior {
+        GapBehavior::PerWindow => gap * 2,
+        GapBehavior::Shared => gap,
+    }
+}
+
+fn find_neighbor_indices(
+    rects: &[(HWND, RECT)],
+    idx: usize,
+    side: &str,
+    max_gap: i32,
+) -> Vec<usize> {
+    let Some(rect) = rects.get(idx).map(|r| r.1) else {
+        return Vec::new();
+    };
+    let mut neighbors = Vec::new();
+
+    let boundary = match side {
+        "right" => rect.right,
+        "left" => rect.left,
+        "top" => rect.top,
+        "bottom" => rect.bottom,
+        _ => return neighbors,
+    };
+
+    for (j, (_, other)) in rects.iter().enumerate() {
+        if j == idx {
+            continue;
+        }
+
+        let aligned = match side {
+            "right" => (other.left - boundary).abs() <= max_gap + EDGE_TOLERANCE,
+            "left" => (other.right - boundary).abs() <= max_gap + EDGE_TOLERANCE,
+            "top" => (other.bottom - boundary).abs() <= max_gap + EDGE_TOLERANCE,
+            "bottom" => (other.top - boundary).abs() <= max_gap + EDGE_TOLERANCE,
+            _ => false,
+        };
+
+        if aligned {
+            neighbors.push(j);
+        }
+    }
+
+    neighbors
+}
+
+fn find_aligned_indices(
+    rects: &[(HWND, RECT)],
+    idx: usize,
+    side: &str,
+) -> Vec<usize> {
+    let Some(rect) = rects.get(idx).map(|r| r.1) else {
+        return Vec::new();
+    };
+    let mut aligned = Vec::new();
+
+    let boundary = match side {
+        "right" => rect.right,
+        "left" => rect.left,
+        "top" => rect.top,
+        "bottom" => rect.bottom,
+        _ => return aligned,
+    };
+
+    let tol = EDGE_TOLERANCE * 4;
+    for (j, (_, other)) in rects.iter().enumerate() {
+        let matches = match side {
+            "right" => (other.right - boundary).abs() <= tol,
+            "left" => (other.left - boundary).abs() <= tol,
+            "top" => (other.top - boundary).abs() <= tol,
+            "bottom" => (other.bottom - boundary).abs() <= tol,
+            _ => false,
+        };
+
+        if matches {
+            aligned.push(j);
+        }
+    }
+
+    aligned
+}
+
+fn compute_layout_targets(
+    windows: &[ManagedWindow],
+    display: &DisplayInfo,
+    config: &WindowManagerConfig,
+    layout_strategy: &dyn LayoutStrategy,
+) -> Vec<(HWND, RECT)> {
+    let mut finals = Vec::new();
+
+    for (idx, window) in windows.iter().enumerate() {
+        let target = layout_strategy.calculate_layout(
+            display,
+            windows.len(),
+            idx,
+            config,
+        );
+
+        let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target);
+        finals.push((window.hwnd, adjusted_target));
+    }
+
+    finals
+}
+
+pub fn update_resize_state_for_window(
+    display: &DisplayInfo,
+    all_displays: &[DisplayInfo],
+    config: &WindowManagerConfig,
+    layout_strategy: &dyn LayoutStrategy,
+    hwnd: HWND,
+) -> bool {
+    if config.manager_type.unwrap_or_default() != ManagerType::Tiling {
+        return false;
+    }
+
+    let default_filters = FiltersConfig::default();
+    let filters = config.filters.as_ref().unwrap_or(&default_filters);
+    let windows = enumerate_windows_with_all(display, all_displays, filters);
+    if windows.is_empty() {
+        return false;
+    }
+
+    let mut finals = compute_layout_targets(&windows, display, config, layout_strategy);
+    apply_resize_deltas(display, config, &mut finals);
+
+    let idx = finals.iter().position(|(h, _)| *h == hwnd);
+    let Some(idx) = idx else { return false; };
+    let expected = finals[idx].1;
+
+    let actual = unsafe {
+        let mut rect: RECT = mem::zeroed();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return false;
+        }
+        rect
+    };
+
+    let mut intent = ResizeIntent::default();
+
+    let dl = actual.left - expected.left;
+    let dr = actual.right - expected.right;
+    if dl.abs() >= 1 || dr.abs() >= 1 {
+        if (dl - dr).abs() > 1 {
+            if dl.abs() >= dr.abs() {
+                intent.left = Some(actual.left);
+            } else {
+                intent.right = Some(actual.right);
+            }
+        }
+    }
+
+    let dt = actual.top - expected.top;
+    let db = actual.bottom - expected.bottom;
+    if dt.abs() >= 1 || db.abs() >= 1 {
+        if (dt - db).abs() > 1 {
+            if dt.abs() >= db.abs() {
+                intent.top = Some(actual.top);
+            } else {
+                intent.bottom = Some(actual.bottom);
+            }
+        }
+    }
+
+    if intent.left.is_none()
+        && intent.right.is_none()
+        && intent.top.is_none()
+        && intent.bottom.is_none()
+    {
+        return false;
+    }
+
+    let bounds = get_layout_bounds(display, config);
+    let internal_gap = get_internal_gap(config);
+
+    if expected.left <= bounds.left + EDGE_TOLERANCE {
+        intent.left = None;
+    }
+    if expected.right >= bounds.right - EDGE_TOLERANCE {
+        intent.right = None;
+    }
+    if expected.top <= bounds.top + EDGE_TOLERANCE {
+        intent.top = None;
+    }
+    if expected.bottom >= bounds.bottom - EDGE_TOLERANCE {
+        intent.bottom = None;
+    }
+
+    if intent.right.is_some() && find_neighbor_indices(&finals, idx, "right", internal_gap).is_empty() {
+        intent.right = None;
+    }
+    if intent.left.is_some() && find_neighbor_indices(&finals, idx, "left", internal_gap).is_empty() {
+        intent.left = None;
+    }
+    if intent.top.is_some() && find_neighbor_indices(&finals, idx, "top", internal_gap).is_empty() {
+        intent.top = None;
+    }
+    if intent.bottom.is_some() && find_neighbor_indices(&finals, idx, "bottom", internal_gap).is_empty() {
+        intent.bottom = None;
+    }
+
+    if intent.left.is_none()
+        && intent.right.is_none()
+        && intent.top.is_none()
+        && intent.bottom.is_none()
+    {
+        return false;
+    }
+
+    let state = RESIZE_STATE
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone();
+    let mut state_map = state.lock().unwrap();
+    let monitor_state = state_map.entry(display.id.clone()).or_insert_with(HashMap::new);
+    monitor_state.insert(hwnd.0 as isize, intent);
+
+    true
+}
+
+fn apply_resize_deltas(
+    display: &DisplayInfo,
+    config: &WindowManagerConfig,
+    rects: &mut Vec<(HWND, RECT)>,
+) {
+    if config.manager_type.unwrap_or_default() != ManagerType::Tiling {
+        return;
+    }
+
+    let internal_gap = get_internal_gap(config);
+
+    let state = RESIZE_STATE
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone();
+    let mut state_map = state.lock().unwrap();
+    let monitor_state = match state_map.get_mut(&display.id) {
+        Some(state) => state,
+        None => return,
+    };
+
+    monitor_state.retain(|hwnd, _| rects.iter().any(|(h, _)| h.0 as isize == *hwnd));
+
+    let mut deltas: HashMap<usize, (i32, i32, i32, i32)> = HashMap::new();
+    let mut ops: Vec<(Vec<usize>, Vec<usize>, i32, &'static str)> = Vec::new();
+
+    for idx in 0..rects.len() {
+        let hwnd_val = (rects[idx].0).0 as isize;
+        let Some(intent) = monitor_state.get(&hwnd_val).copied() else {
+            continue;
+        };
+
+        if let Some(target_right) = intent.right {
+            let delta = target_right - rects[idx].1.right;
+            if delta != 0 {
+                let same = find_aligned_indices(rects, idx, "right");
+                let neighbors = find_neighbor_indices(rects, idx, "right", internal_gap);
+                ops.push((same, neighbors, delta, "right"));
+            }
+        }
+
+        if let Some(target_left) = intent.left {
+            let delta = target_left - rects[idx].1.left;
+            if delta != 0 {
+                let same = find_aligned_indices(rects, idx, "left");
+                let neighbors = find_neighbor_indices(rects, idx, "left", internal_gap);
+                ops.push((same, neighbors, delta, "left"));
+            }
+        }
+
+        if let Some(target_bottom) = intent.bottom {
+            let delta = target_bottom - rects[idx].1.bottom;
+            if delta != 0 {
+                let same = find_aligned_indices(rects, idx, "bottom");
+                let neighbors = find_neighbor_indices(rects, idx, "bottom", internal_gap);
+                ops.push((same, neighbors, delta, "bottom"));
+            }
+        }
+
+        if let Some(target_top) = intent.top {
+            let delta = target_top - rects[idx].1.top;
+            if delta != 0 {
+                let same = find_aligned_indices(rects, idx, "top");
+                let neighbors = find_neighbor_indices(rects, idx, "top", internal_gap);
+                ops.push((same, neighbors, delta, "top"));
+            }
+        }
+    }
+
+    for (same, neighbors, delta, side) in ops {
+        match side {
+            "right" => {
+                for n in same {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.1 += delta;
+                }
+                for n in neighbors {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.0 += delta;
+                }
+            }
+            "left" => {
+                for n in same {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.0 += delta;
+                }
+                for n in neighbors {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.1 += delta;
+                }
+            }
+            "bottom" => {
+                for n in same {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.3 += delta;
+                }
+                for n in neighbors {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.2 += delta;
+                }
+            }
+            "top" => {
+                for n in same {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.2 += delta;
+                }
+                for n in neighbors {
+                    let entry = deltas.entry(n).or_insert((0, 0, 0, 0));
+                    entry.3 += delta;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for (idx, (left_delta, right_delta, top_delta, bottom_delta)) in deltas {
+        if left_delta != 0 {
+            rects[idx].1.left += left_delta;
+        }
+        if right_delta != 0 {
+            rects[idx].1.right += right_delta;
+        }
+        if top_delta != 0 {
+            rects[idx].1.top += top_delta;
+        }
+        if bottom_delta != 0 {
+            rects[idx].1.bottom += bottom_delta;
+        }
+    }
+}
+
 /// Animate multiple windows synchronously using DeferWindowPos for atomic updates
 /// This keeps all windows in sync without race conditions or app crashes
 fn animate_windows_batched(
@@ -567,29 +966,19 @@ pub fn apply_layout(
         .unwrap_or(DEFAULT_ANIMATION_DURATION_MS);
 
     let mut animations = Vec::new();
-    let mut finals = Vec::new();
+    let mut finals = compute_layout_targets(windows, display, config, layout_strategy);
+    apply_resize_deltas(display, config, &mut finals);
 
-    unsafe {        
-        for (idx, window) in windows.iter().enumerate() {
-            let target = layout_strategy.calculate_layout(
-                display,
-                windows.len(),
-                idx,
-                config,
-            );
-
+    unsafe {
+        for (hwnd, target) in &finals {
             let mut current: RECT = mem::zeroed();
-            if GetWindowRect(window.hwnd, &mut current).is_err() {
+            if GetWindowRect(*hwnd, &mut current).is_err() {
                 continue;
             }
 
-            let adjusted_target = get_adjusted_rect_for_positioning(window.hwnd, target);
-
-            if current != adjusted_target {
-                animations.push((window.hwnd, current, adjusted_target));
+            if current != *target {
+                animations.push((*hwnd, current, *target));
             }
-
-            finals.push((window.hwnd, adjusted_target));
         }
     }
 
