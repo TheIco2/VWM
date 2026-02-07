@@ -1,5 +1,5 @@
 update_check: true
-debug: true
+debug: false
 log_level: warn
 
 universal:
