@@ -21,7 +21,7 @@ window_manager:
   styling:
     gap:
       space: 10
-      behavior: "Shared" # "Shared" or "PerWindow"
+      behavior: "Shared"
   events: 
     debounce_ms: 500
   
