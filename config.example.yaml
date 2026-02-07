@@ -1,0 +1,49 @@
+update_check: true
+debug: true
+log_level: warn
+
+universal:
+  exclude_processes:
+    - "ShellExperienceHost.exe"
+    - "taskmgr.exe"
+    - "systemsettings.exe"
+    - "steamwebhelper.exe"
+    - "msiexec.exe"
+
+window_manager:
+  enabled: true
+  manager_type: tiling
+  monitor_index:
+    - "*"
+  animation:
+    enabled: true
+    duration: 150
+  styling:
+    gap:
+      space: 10
+      behavior: "Shared" # "Shared" or "PerWindow"
+  events: 
+    debounce_ms: 500
+  
+  filters:
+    min_width: 1
+    min_height: 1
+    
+    include_processes: []
+
+    exclude_processes: []
+
+    exclude_classes:
+      - "Shell_TrayWnd"        
+      - "Progman"              
+      - "WorkerW"              
+      - "Windows.UI.Core"      
+      - "ApplicationFrameWindow"  
+    
+    exclude_titles:
+      - "Program Manager"
+      - "NVIDIA GeForce Overlay"
+      - "Windows Input Experience"
+      - "Task Manager"
+      - "Settings"
+      - "PowerToys Quick Access"
