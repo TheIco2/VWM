@@ -1,4 +1,4 @@
-# 🪟 Sentinel Tiling Window Manager
+# 🪟 Sentinel Window Manager
 
 ![Sentinel Banner](https://img.shields.io/badge/Sentinel-WindowManager-blue) ![Rust](https://img.shields.io/badge/lang-Rust-orange) ![Windows](https://img.shields.io/badge/platform-Windows-brightgreen) ![Status](https://img.shields.io/badge/status-Beta-yellow)
 
