@@ -93,6 +93,7 @@ The window manager automatically excludes:
 - Cloaked windows (e.g., virtual desktop windows on other desktops)
 - Windows without `WS_VISIBLE` style
 - Windows with `WS_EX_TOOLWINDOW` extended style
+- Tooltip and shadow popup windows (e.g., `tooltips_class32`, `SysShadow`)
 - Fullscreen windows (automatically detected and ignored)
 - Popup windows
 - Tool windows

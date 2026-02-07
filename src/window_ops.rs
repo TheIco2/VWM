@@ -159,6 +159,11 @@ pub fn should_manage_window(hwnd: HWND, filters: &FiltersConfig) -> bool {
             return false;
         }
 
+        // Ignore popup windows without captions (tooltips/hover popups)
+        if style.contains(WS_POPUP) && !style.contains(WS_CAPTION) {
+            return false;
+        }
+
         // Ignore tool windows and owned windows (sub-windows/dialogs)
         let ex_style = WINDOW_EX_STYLE(GetWindowLongW(hwnd, GWL_EXSTYLE) as u32);
         if ex_style.contains(WS_EX_TOOLWINDOW) {
@@ -184,6 +189,11 @@ pub fn should_manage_window(hwnd: HWND, filters: &FiltersConfig) -> bool {
         let title = get_window_title(hwnd);
         let class_name = get_window_class_name(hwnd);
         let process_name = get_process_name(hwnd);
+
+        let class_lower = class_name.to_lowercase();
+        if class_lower == "tooltips_class32" || class_lower == "sysshadow" {
+            return false;
+        }
 
         // Ignore common installer dialogs
         if class_name == "#32770" {
