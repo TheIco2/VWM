@@ -1,245 +1,210 @@
-# Tiling Window Manager
+# 🪟 Sentinel Tiling Window Manager
 
-**Dynamic, multi-monitor window management** for Sentinel — fast tiling, clean gaps, smooth animations, and now **edge‑drag resizing** that the BSP layout respects.
+![Sentinel Banner](https://img.shields.io/badge/Sentinel-WindowManager-blue) ![Rust](https://img.shields.io/badge/lang-Rust-orange) ![Windows](https://img.shields.io/badge/platform-Windows-brightgreen) ![Status](https://img.shields.io/badge/status-Beta-yellow)
 
-## Features
+**Dynamic, multi-monitor window management** for Sentinel — fast tiling, smooth animations, clean gaps, and **edge-drag resizing** in BSP layouts.
 
-> A modern tiling workflow with predictable placement, clean spacing, and configurable behavior per monitor.
+> ⚡ Modern tiling workflow with predictable placement, clean spacing, and per-monitor customization.
 
-### Layout Managers
+---
 
-The window manager supports three distinct layout modes:
+## 🚀 Features
 
-#### 1. **Tiling Layout** (Default)
+| Feature                   | Description                                                                 | Status |
+| ------------------------- | --------------------------------------------------------------------------- | ------ |
+| **Tiling Layout (BSP)**   | Automatic BSP window arrangement with drag-to-reorder and per-monitor state | ✅     |
+| **Floating Layout**       | Natural window positions for freeform workflows                             | ✅     |
+| **Stacking Layout**       | Focused full-screen stack of windows                                        | ✅     |
+| **Edge-Drag Resizing**    | Resize windows while maintaining BSP integrity                              | ✅     |
+| **Smooth Animations**     | Configurable duration, toggleable                                           | ✅     |
+| **Gap Management**        | Per-window or shared gaps for clean spacing                                 | ✅     |
+| **Multi-Monitor Support** | Per-monitor layouts, smart boundary detection                               | ✅     |
+| **Window Filtering**      | Dimension, process, class, title filters, auto exclusions                   | ✅     |
+| **Hot-Reload Config**     | YAML updates live without restarting                                        | ✅     |
+| **IPC Integration**       | Sentinel IPC-aware for dynamic updates                                      | ✅     |
 
-- **BSP (Binary Space Partitioning)** algorithm for dynamic window arrangement
-- Automatically splits screen space between windows
-- Intelligent splitting direction based on available space (horizontal vs vertical)
-- Supports both shared and per-window gap behaviors
-- **Position-based window ordering** - windows maintain stable positions based on their screen coordinates
-- **Drag-to-reorder** - physically drag windows to reposition them in the layout order
-  - Swap functionality: dragging a window onto another window's position swaps their order
-  - Order is determined by position and drag actions
-- **Per-monitor BSP state** - each monitor maintains its own independent window order
-- **Smart monitor boundary detection** - keeps windows assigned to the intended monitor during drag operations
-  - 50% overlap threshold on adjacent monitor edges governs cross-monitor swaps
-  - Flexible positioning on isolated edges
-- **Edge‑drag resizing** - resize any tiled window by dragging its edges
-  - Neighboring windows adjust along shared boundaries
-  - Resizes persist and the BSP layout respects updated boundaries
+---
 
-#### 2. **Floating Layout**
+## 🖼️ Layout Diagrams
 
-- Windows retain their natural positions
-- Useful for non-tiled workflows
+### 1️⃣ Tiling Layout (BSP)
 
-#### 3. **Stacking Layout**
-
-- All windows stacked in the same position
-- Maximizes screen real estate for focused work
-- Quick switching between full-screen windows
-
-### Window Animations
-
-Smooth, configurable animations when windows are repositioned:
-
-- **Toggle animations** on/off per configuration
-- **Configurable duration** (default: 150ms)
-- Native Windows animation support via `SetWindowPos` with `SWP_ASYNCWINDOWPOS`
-
-### Resizing
-
-- **Direct edge dragging** in tiling mode
-- **Boundary-aware propagation** to adjacent windows
-- **Persistent layout updates** so the BSP layout respects resize adjustments
-
-### Gap Management
-
-Flexible gap system with two distinct behaviors:
-
-#### Per-Window Gap (Default)
-
-- Each window has a full gap on all sides
-- Interior gaps are naturally doubled where windows meet
-- Clean, uniform spacing around every window
-
-#### Shared Gap
-
-- Interior gaps are shared between adjacent windows (halved)
-- Edge gaps remain full-width for monitor boundaries
-- More space-efficient for crowded layouts
-
-### Window Filtering
-
-Comprehensive filtering system to control which windows are managed:
-
-#### Dimension Filters
-
-- **`min_width`** - Minimum window width in pixels
-- **`min_height`** - Minimum window height in pixels
-
-#### Process Filters
-
-- **`include_processes`** - Whitelist specific processes (when set, only these processes are managed)
-- **`exclude_processes`** - Blacklist specific processes
-  - Default excludes: `explorer.exe`, `taskmgr.exe`, `systemsettings.exe`, `steamwebhelper.exe`, `msiexec.exe`
-
-#### Class Filters
-
-- **`exclude_classes`** - Exclude windows by window class name
-  - Default excludes: `Shell_TrayWnd`, `Progman`, `WorkerW`
-
-#### Title Filters
-
-- **`exclude_titles`** - Exclude windows by window title
-  - Default excludes: "Program Manager", "Task Manager", "Settings", "Windows Input Experience", "PowerToys Quick Access"
-
-### Automatic Filters
-
-The window manager automatically filters:
-
-- Invisible windows
-- Minimized windows
-- Cloaked windows (e.g., virtual desktop windows on other desktops)
-- Windows without `WS_VISIBLE` style
-- Windows with `WS_EX_TOOLWINDOW` extended style
-- Tooltip and shadow popup windows (e.g., `tooltips_class32`, `SysShadow`)
-- Fullscreen windows (automatically detected and ignored)
-- Popup windows
-- Tool windows
-- Windows without captions
-
-### Multi-Monitor Support
-
-Full multi-monitor capability:
-
-- **Per-monitor configuration** - Each monitor can have its own layout type, gaps, filters, and settings
-- **Monitor index selection** - Configure specific monitors or use `"*"` for all monitors
-- **Independent BSP state** - Each monitor maintains its own window order
-- **Intelligent monitor assignment** - Windows are assigned to monitors based on intersection area
-- **Smart boundary detection** - Detects which monitor edges have adjacent monitors
-  - Keeps windows aligned with their assigned monitor boundaries
-  - Supports flexible placement on isolated edges
-- **Dynamic monitor topology** - Automatically adapts to display configuration changes
-
-### Window Events
-
-Real-time window management via Windows event hooks:
-
-- **Window creation/destruction** - Automatically retiles when windows appear or disappear
-- **Window show/hide** - Responds to visibility changes
-- **Drag detection** - Tracks when windows are being manually moved
-- **Move/resize end events** - Updates layout after user repositions windows
-- **Debounced retiling** - Configurable delay (default: 500ms) prevents excessive retiling
-- **Rate-limited logging** - Prevents log spam from noisy windows (250ms window per event type)
-
-### Configuration Hot-Reload
-
-- **YAML file watching** - Automatically detects changes to `config.yaml`
-- **Live updates** - Configuration changes apply immediately without restart
-- **Cross-platform watching** - Uses `notify` crate for file system events
-
-### IPC Integration
-
-Seamless integration with Sentinel's IPC system:
-
-- **Monitor information** - Retrieves display data via `get_displays` IPC call
-- **Dynamic updates** - Responds to monitor configuration changes from Sentinel core
-
-## Configuration
-
-Configuration is managed via YAML file at `~/.Sentinel/addons/windowmanager/config.yaml`:
-
-```yaml
-update_check: true
-debug: false
-log_level: warn
-
-universal:
-  exclude_processes:
-    - "ShellExperienceHost.exe"
-    - "taskmgr.exe"
-
-window_manager:
-  enabled: true
-  manager_type: tiling  # Options: tiling, floating, stacking
-  monitor_index:
-    - "*"  # All monitors, or specify indices: [0, 1, 2]
-  
-  animation:
-    enabled: true
-    duration: 150  # milliseconds
-  
-  styling:
-    gap:
-      space: 10  # pixels
-      behavior: per_window  # Options: per_window, shared
-  
-  events:
-    debounce_ms: 500  # milliseconds
-  
-  filters:
-    min_width: 200  # optional
-    min_height: 150  # optional
-    exclude_processes:
-      - "explorer.exe"
-      - "steamwebhelper.exe"
-    exclude_classes:
-      - "Shell_TrayWnd"
-    exclude_titles:
-      - "Task Manager"
-
-  # Resizing is enabled automatically in tiling mode
+```pwsh
++----------------+----------------+
+|       W1       |       W2       |
+|                +-------+--------+
+|                |  W3   |  W4    |
++----------------+-------+--------+
 ```
 
-## Architecture
+* Windows split dynamically by screen space
+* Drag-to-reorder & swap supported
+* Edge-drag resizing affects neighbors
 
-### Core Components
+### 2️⃣ Floating Layout
 
-- **`main.rs`** - Entry point, IPC communication, event loop management
-- **`window_ops.rs`** - Window enumeration, filtering, BSP state management, drag-to-reorder logic
-- **`layout.rs`** - Layout strategy implementations (Tiling/BSP, Floating, Stacking)
-- **`window_events.rs`** - Windows event hook system, debouncing, event management
-- **`types.rs`** - Core data structures (DisplayInfo, WindowManagerConfig, ManagedWindow)
-- **`config/`** - Configuration modules (animation, events, filters, styling)
-- **`data_loaders/`** - YAML/JSON parsing and loading
-- **`watchers.rs`** - File system watching for hot-reload
-- **`ipc_connector.rs`** - Sentinel IPC communication
+```pwsh
++----------------+----------------+
+|       W1       |   (floating)   |
+|     W2         |                |
++----------------+----------------+
+```
 
-### Window Order Management
+* Freeform, natural positions
+* No automatic tiling
 
-The window manager uses a sophisticated position-based ordering system:
+### 3️⃣ Stacking Layout
 
-1. **Enumeration** - Windows are enumerated with their screen positions
-2. **Stable Sorting** - Multi-level sort: (y, x) position → existing order → hwnd
-3. **Per-Monitor State** - Each monitor's window order stored in `HashMap<DisplayInfo.id, Vec<hwnd>>`
-4. **Drag Detection** - `EVENT_SYSTEM_MOVESIZEEND` triggers order update
-5. **Swap Logic** - Finds window under drop position and swaps order indices
-6. **Retiling** - Layout recalculated with new order
+```pwsh
++----------------+
+|       W1       |
+|       W2       |
+|       W3       |
++----------------+
+```
 
-### Monitor Boundary Detection
+* Stack all windows for focus
+* Quick full-screen switching
 
-Smart boundary system prevents unwanted cross-monitor behavior:
+---
 
-1. **Adjacency Detection** - Checks if another monitor's edge aligns perfectly with current monitor's edge
-2. **Directional Thresholds** - Applies 50% overlap requirement only on adjacent sides
-3. **Isolated Edges** - Allows any intersection on sides without adjacent monitors
-4. **Independent Checks** - Horizontal and vertical constraints evaluated separately
+## ⚙️ Configuration
 
-## Technical Details
+**Path:** `~/.Sentinel/addons/windowmanager/config.yaml`
 
-- **Language**: Rust
-- **Platform**: Windows (Win32 API)
-- **Window Positioning**: `SetWindowPos` with `HWND_TOP` and `SWP_ASYNCWINDOWPOS`
-- **Event System**: Windows Accessibility Event Hooks (`SetWinEventHook`)
-- **Configuration**: YAML with `serde` deserialization
-- **File Watching**: `notify` crate for cross-platform filesystem events
-- **Threading**: Debounced retiling via spawned threads with mutex-protected state
+<details>
+<summary>Click to expand YAML</summary>
 
-## Building
+```yaml
+update_check: true        # Check for addon updates
+debug: false              # Enable verbose debug logging
+log_level: warn           # trace | debug | info | warn | error
+
+# Universal filters apply to all addons
+universal:
+  exclude_processes:      # Always ignore these processes
+    - "ShellExperienceHost.exe"
+    - "taskmgr.exe"
+    - "systemsettings.exe"
+    - "steamwebhelper.exe"
+    - "msiexec.exe"
+
+window_manager:
+  enabled: true            # Master toggle for the window manager
+
+  # Layout type: tiling | floating | stacking
+  manager_type: tiling
+
+  # Target monitors by index ("*" = all monitors)
+  # Example: ["0", "1"] or ["*"]
+  monitor_index:
+    - "*"
+
+  # Window animations when applying layout
+  animation:
+    enabled: true
+    duration: 150          # milliseconds
+
+  # Visual styling
+  styling:
+    gap:
+      space: 10            # pixels between windows
+      behavior: "Shared"   # Shared | PerWindow
+
+  # Event handling
+  events:
+    debounce_ms: 500       # Delay between retiles after window events
+
+  # Window filters (applied after universal filters)
+  filters:
+    # Minimum dimensions to manage
+    min_width: 1
+    min_height: 1
+
+    # Include only these processes (empty = allow all)
+    include_processes: []
+
+    # Exclude specific processes (empty = exclude none)
+    exclude_processes: []
+
+    # Exclude window classes by partial match
+    exclude_classes:
+      - "Shell_TrayWnd"
+      - "Progman"
+      - "WorkerW"
+      - "Windows.UI.Core"
+      - "ApplicationFrameWindow"
+
+    # Exclude windows by title substring
+    exclude_titles:
+      - "Program Manager"
+      - "NVIDIA GeForce Overlay"
+      - "Windows Input Experience"
+      - "Task Manager"
+      - "Settings"
+      - "PowerToys Quick Access"
+```
+
+</details>
+
+---
+
+## 🏗️ Architecture Overview
+
+```pwsh
+Sentinel Window Manager
+┌───────────────┐
+│   main.rs     │ ← IPC & event loop
+├───────────────┤
+│ window_ops.rs │ ← enumeration, filtering, BSP logic
+├───────────────┤
+│   layout.rs   │ ← Tiling / Floating / Stacking
+├───────────────┤
+│window_events.rs│ ← Windows event hooks
+├───────────────┤
+│   types.rs    │ ← Core data structures
+├───────────────┤
+│  watchers.rs  │ ← Config hot-reload
+├───────────────┤
+│ ipc_connector │ ← Sentinel IPC
+└───────────────┘
+```
+
+---
+
+## 🔧 Multi-Monitor & Window Management
+
+* **Per-monitor BSP state**
+* **Intelligent monitor assignment**
+* **Boundary-aware edge detection**
+* **Dynamic topology adaptation**
+
+### Window Filtering Highlights
+
+* Dimensions: `min_width`, `min_height`
+* Processes: `include` / `exclude`
+* Classes: `exclude_classes`
+* Titles: `exclude_titles`
+* Automatic: hidden, minimized, cloaked, tooltips, fullscreen, popup, captionless
+
+---
+
+## 🛠️ Technical Stack
+
+* **Language:** Rust
+* **Platform:** Windows (Win32 API)
+* **Window Positioning:** `SetWindowPos` (`HWND_TOP`, `SWP_ASYNCWINDOWPOS`)
+* **Event System:** Windows Accessibility Event Hooks (`SetWinEventHook`)
+* **Config:** YAML via `serde`
+* **File Watching:** `notify` crate
+* **Threading:** Debounced retiling with mutex-protected threads
+
+---
+
+## ⚡ Building
 
 ```bash
 cargo build --release
 ```
 
-The compiled binary will be at `target/release/sentinel-windowmanager.exe`
+**Output:** `target/release/sentinel-windowmanager.exe`
