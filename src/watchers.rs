@@ -1,6 +1,15 @@
-use crate::{info, warn};
-use crate::DEBUG_NAME;
-use std::path::{Path, PathBuf};
+use crate::{
+    info, warn, DEBUG_NAME,
+    ipc_connector::request,
+
+};
+
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+    thread,
+    path::{Path, PathBuf},
+};
 
 const DEBUG_SUBTAG: &str = "WATCHER";
 const ADDON_NAME: &str = "Window Manager";
@@ -8,10 +17,6 @@ const ADDON_NAME: &str = "Window Manager";
 /// Universal YAML watcher: watches for changes in YAML config files in the given directory for the given addon.
 pub fn yaml_watcher(directory: &Path, is_update_check_enabled: fn() -> bool)
 {
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use std::thread;
-    use crate::ipc_connector::request;
     let directory = directory.to_path_buf();
     thread::spawn(move || {
         let yaml_path: PathBuf = directory;

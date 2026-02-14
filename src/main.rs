@@ -13,13 +13,22 @@ mod utility;
 mod watchers;
 mod data_loaders;
 
-use ipc_connector::request;
-use data_loaders::yaml::load_yaml;
-use types::{DisplayInfo, WindowManagerConfig};
-use config::UniversalConfig;
-use window_events::{EventManager, setup_event_hooks, cleanup_event_hooks, set_event_manager};
-use watchers::yaml_watcher;
-use utility::{sentinel_addons_dir, sentinel_assets_dir};
+use crate::{
+    ipc_connector::request,
+    data_loaders::yaml::load_yaml,
+    config::UniversalConfig,
+    watchers::yaml_watcher,
+    utility::{sentinel_addons_dir, sentinel_assets_dir},
+    types::{DisplayInfo, WindowManagerConfig},
+    window_events::{
+        event_manager::{
+            EventManager,
+            set_event_manager,
+        }, 
+        setup_hooks::setup_event_hooks, 
+        cleanup_hooks::cleanup_event_hooks,
+    }
+};
 
 use windows::{
     Win32::{
@@ -166,6 +175,7 @@ fn check_assets() {
 }
 
 pub fn initial_startup() {
+    info!("!---------- [{}] Starting Window Manager Addon ----------!", DEBUG_NAME);
     info!("[{}] Performing initial startup tasks", DEBUG_NAME);
     // Check and create config.yaml if missing
     check_config();

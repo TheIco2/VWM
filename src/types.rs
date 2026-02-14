@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::HWND;
-use crate::config::{AnimationConfig, EventsConfig, FiltersConfig, StylingConfig};
+use crate::{
+    config::{AnimationConfig, EventsConfig, FiltersConfig, StylingConfig},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DisplayInfo {
