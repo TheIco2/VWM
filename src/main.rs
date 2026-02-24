@@ -108,6 +108,7 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
+    logging::init(true, "info");
     bootstrap::bootstrap_addon();
     initial_startup();
     let mut debug_enabled = false;
@@ -148,7 +149,7 @@ fn main() -> windows::core::Result<()> {
         }
     }
 
-    logging::init(debug_enabled, &log_level);
+    logging::set_debug(debug_enabled);
     std::panic::set_hook(Box::new(|info| {
         error!("[{}] Panic: {}", DEBUG_NAME, info);
     }));

@@ -2,15 +2,19 @@
 
 use std::fs;
 use std::path::PathBuf;
-use crate::{info, warn, error, ADDON_NAME};
+use crate::ADDON_NAME;
 use crate::utility::sentinel_addons_dir;
+use crate::{info, warn};
 
-/// Returns the canonical addon install directory: `~/.Sentinel/Addons/windowmanager/`
+const EXE_NAME: &str = "sentinel-windowmanager.exe";
+
+
+/// Returns the canonical addon install directory
 fn addon_install_dir() -> Option<PathBuf> {
     sentinel_addons_dir().map(|d| d.join(ADDON_NAME))
 }
 
-/// Returns true if the currently running exe is inside the addon's `bin/` folder.
+/// Returns true if the currently running exe is inside the addon's bin/ folder.
 fn is_running_from_install_dir() -> bool {
     let install_bin = match addon_install_dir() {
         Some(d) => d.join("bin"),
@@ -22,9 +26,45 @@ fn is_running_from_install_dir() -> bool {
     }
 }
 
-/// Bootstrap the addon: create directory structure, scaffold default files,
-/// copy the exe into `bin/`, and relaunch from the installed location.
+/// Check if sentinelc.exe (the backend) is running; if not, start it.
+fn ensure_backend_running() {
+    info!("[{}] Checking if sentinelc.exe is running...", ADDON_NAME);
+    let backend_running = std::process::Command::new("tasklist")
+        .args(["/FI", "IMAGENAME eq sentinelc.exe", "/NH"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("sentinelc.exe"))
+        .unwrap_or(false);
+
+    if backend_running {
+        info!("[{}] sentinelc.exe is already running", ADDON_NAME);
+        return;
+    }
+
+    warn!("[{}] sentinelc.exe is NOT running, attempting to start it", ADDON_NAME);
+    let Some(home) = std::env::var("USERPROFILE").ok() else {
+        warn!("[{}] Cannot resolve USERPROFILE to find sentinelc.exe", ADDON_NAME);
+        return;
+    };
+    let backend_exe = PathBuf::from(&home).join(".Sentinel").join("sentinelc.exe");
+    if !backend_exe.exists() {
+        warn!("[{}] Backend not found at {}", ADDON_NAME, backend_exe.display());
+        return;
+    }
+    match std::process::Command::new(&backend_exe).spawn() {
+        Ok(_) => {
+            info!("[{}] Started sentinelc.exe from {}", ADDON_NAME, backend_exe.display());
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+        }
+        Err(e) => warn!("[{}] Failed to start sentinelc.exe: {e}", ADDON_NAME),
+    }
+}
+
 pub fn bootstrap_addon() {
+    info!("[{}] === Bootstrap starting ===", ADDON_NAME);
+    info!("[{}] Current exe: {:?}", ADDON_NAME, std::env::current_exe());
+
+    ensure_backend_running();
+
     let addon_dir = match addon_install_dir() {
         Some(d) => d,
         None => {
@@ -32,64 +72,75 @@ pub fn bootstrap_addon() {
             return;
         }
     };
+    info!("[{}] Addon directory: {}", ADDON_NAME, addon_dir.display());
 
-    // Create directory structure
     let bin_dir = addon_dir.join("bin");
     let options_dir = addon_dir.join("options");
     let _ = fs::create_dir_all(&bin_dir);
     let _ = fs::create_dir_all(&options_dir);
-    info!("[{}] Ensured addon directory structure at {}", ADDON_NAME, addon_dir.display());
+    info!("[{}] Created directory structure at {}", ADDON_NAME, addon_dir.display());
 
-    // Scaffold default files (only if they don't already exist)
     scaffold_addon_json(&addon_dir);
     scaffold_config_yaml(&addon_dir);
     scaffold_schema_yaml(&addon_dir);
     scaffold_options_html(&options_dir);
+    info!("[{}] Scaffolding complete", ADDON_NAME);
 
-    // If already running from the install dir, nothing more to do
     if is_running_from_install_dir() {
-        info!("[{}] Already running from install directory", ADDON_NAME);
+        info!("[{}] Already running from install directory - continuing startup", ADDON_NAME);
         return;
     }
 
-    // --- Self-install: copy exe into bin/ and relaunch ---
     let current_exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => { warn!("[{}] Cannot determine current exe path: {e}", ADDON_NAME); return; }
     };
 
-    let dst = bin_dir.join("sentinel-windowmanager.exe");
+    let dst = bin_dir.join(EXE_NAME);
+    info!("[{}] Source: {}", ADDON_NAME, current_exe.display());
+    info!("[{}] Target: {}", ADDON_NAME, dst.display());
 
     let should_copy = match (fs::metadata(&current_exe), fs::metadata(&dst)) {
         (Ok(src_meta), Ok(dst_meta)) => {
+            let src_size = src_meta.len();
+            let dst_size = dst_meta.len();
             let src_newer = src_meta.modified().ok().zip(dst_meta.modified().ok())
                 .map(|(s, d)| s > d).unwrap_or(false);
-            src_newer || src_meta.len() != dst_meta.len()
+            info!("[{}] Source size={src_size}, Target size={dst_size}, source_newer={src_newer}", ADDON_NAME);
+            src_newer || src_size != dst_size
         }
-        (Ok(_), Err(_)) => true,
-        _ => false,
+        (Ok(src_meta), Err(_)) => {
+            info!("[{}] Target does not exist, source size={}", ADDON_NAME, src_meta.len());
+            true
+        }
+        _ => {
+            warn!("[{}] Cannot read source exe metadata", ADDON_NAME);
+            false
+        }
     };
 
     if should_copy {
+        info!("[{}] Copying exe to install directory...", ADDON_NAME);
         match fs::copy(&current_exe, &dst) {
-            Ok(_) => info!("[{}] Installed exe -> {}", ADDON_NAME, dst.display()),
+            Ok(bytes) => info!("[{}] Copied {bytes} bytes -> {}", ADDON_NAME, dst.display()),
             Err(e) => {
-                error!("[{}] Failed to copy exe to install dir: {e}", ADDON_NAME);
+                warn!("[{}] Failed to copy exe: {e}", ADDON_NAME);
                 return;
             }
         }
+    } else {
+        info!("[{}] Exe already up to date, skipping copy", ADDON_NAME);
     }
 
-    // Relaunch from installed location
     let args: Vec<String> = std::env::args().skip(1).collect();
-    info!("[{}] Relaunching from installed location: {}", ADDON_NAME, dst.display());
+    info!("[{}] Relaunching from {} with args: {:?}", ADDON_NAME, dst.display(), args);
     match std::process::Command::new(&dst).args(&args).spawn() {
         Ok(_) => {
             info!("[{}] Relaunch successful, exiting current process", ADDON_NAME);
             std::process::exit(0);
         }
         Err(e) => {
-            warn!("[{}] Failed to relaunch from installed location: {e}", ADDON_NAME);
+            warn!("[{}] Failed to relaunch: {e}", ADDON_NAME);
         }
     }
 }
@@ -311,22 +362,22 @@ fn scaffold_options_html(options_dir: &PathBuf) {
 r#"<!DOCTYPE html>
 <html>
 <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>{title}</title>
-	<link rel="stylesheet" href="./options.css" />
-	<script src="./options.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{title}</title>
+<link rel="stylesheet" href="./options.css" />
+<script src="./options.js"></script>
 </head>
 <body>
-	<main class="page">
-		<div id="{root_id}"></div>
-	</main>
+<main class="page">
+<div id="{root_id}"></div>
+</main>
 </body>
 </html>
 "#);
         match fs::write(&path, content) {
-            Ok(_) => info!("[{}] Created options/{}", ADDON_NAME, file),
-            Err(e) => warn!("[{}] Failed to create options/{}: {e}", ADDON_NAME, file),
+            Ok(_) => info!("[{}] Created options/{file}", ADDON_NAME),
+            Err(e) => warn!("[{}] Failed to create options/{file}: {e}", ADDON_NAME),
         }
     }
 }
