@@ -1,6 +1,7 @@
 // ~/Sentinel/sentinel-addons/windowmanager/src/main.rs
 
 #![windows_subsystem = "windows"] 
+mod bootstrap;
 mod ipc_connector;
 
 mod logging;
@@ -75,86 +76,6 @@ fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
 /* =========================
    Initial Startup
    ========================= */
-fn check_config() {
-    // Checks if config.yaml at '~/.Sentinel/addons/<addon>/' exists, if not create default
-    if let Some(addons_dir) = sentinel_addons_dir() {
-        let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
-        if !yaml_path.exists() {
-            info!("[{}] No config.yaml found for Window Manager, creating default", DEBUG_NAME);
-            // Create default config.yaml
-            let default_yaml = r#"update_check: true
-debug: false
-log_level: warn
-
-# Window Manager Configuration
-
-universal:
-  exclude_processes:
-    - "ShellExperienceHost.exe"
-    - "taskmgr.exe"
-    - "explorer.exe"
-    - "systemsettings.exe"
-    - "steamwebhelper.exe"
-    - "msiexec.exe"
-
-window_manager:
-  enabled: true
-  manager_type: tiling
-  monitor_index:
-    - "*"
-  animation:
-    enabled: true
-    duration: 150
-  styling:
-    gap:
-      space: 5
-      behavior: "Shared"
-  events:
-    debounce_ms: 500
-  
-  filters:
-    min_width: 1
-    min_height: 1
-    
-    include_processes: []
-
-    exclude_processes:
-      - "ShellExperienceHost.exe"
-      - "taskmgr.exe"
-      - "explorer.exe"
-      - "systemsettings.exe"
-      - "steamwebhelper.exe"
-      - "msiexec.exe"
-    
-    exclude_classes:
-      - "Shell_TrayWnd"        
-      - "Progman"              
-      - "WorkerW"              
-      - "Windows.UI.Core"      
-      - "ApplicationFrameWindow"  
-    
-    exclude_titles:
-      - "Program Manager"
-      - "NVIDIA GeForce Overlay"
-      - "Windows Input Experience"
-      - "Task Manager"
-      - "Settings"
-      - "PowerToys Quick Access"
-"#;
-
-            if let Err(e) = std::fs::write(&yaml_path, default_yaml) {
-                error!("[{}] Failed to create default config.yaml: {}", DEBUG_NAME, e);
-            } else {
-                info!("[{}] Default config.yaml created at {}", DEBUG_NAME, yaml_path.display());
-            }
-        } else {
-            info!("[{}] Found existing config.yaml for Window Manager", DEBUG_NAME);
-        }   
-    } else {
-        error!("[{}] Failed to get addons directory", DEBUG_NAME);
-    }
-}
-
 fn check_assets() {
     // Check if assets directory '~/.Sentinel/Assets/windowmanager' exists
     if let Some(assets_dir) = sentinel_assets_dir() {
@@ -178,8 +99,6 @@ fn check_assets() {
 pub fn initial_startup() {
     info!("!---------- [{}] Starting Window Manager Addon ----------!", DEBUG_NAME);
     info!("[{}] Performing initial startup tasks", DEBUG_NAME);
-    // Check and create config.yaml if missing
-    check_config();
     // Check and create assets directory if missing
     check_assets();
 }
@@ -189,6 +108,7 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
+    bootstrap::bootstrap_addon();
     initial_startup();
     let mut debug_enabled = false;
     let mut log_level = "warn".to_string();
