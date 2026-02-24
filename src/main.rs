@@ -12,6 +12,7 @@ mod config;
 mod utility;
 mod watchers;
 mod data_loaders;
+mod paths;
 
 use crate::{
     ipc_connector::request,
