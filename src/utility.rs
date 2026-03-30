@@ -5,7 +5,7 @@ use std::{
     path::PathBuf
 };
 
-// Sentinel Wide String Utilities
+// OpenDesktop Wide String Utilities
 // --------------------------------
 
 // Utility function to convert &str to wide string (Vec<u16>)
@@ -25,7 +25,7 @@ pub fn _from_wstring(ws: &[u16]) -> String {
 
 
 
-// Sentinel Directory Utilities
+// OpenDesktop Directory Utilities
 // --------------------------------
 
 // Get user home directory
@@ -33,18 +33,18 @@ pub fn user_home_dir() -> Option<PathBuf> {
     env::var("USERPROFILE").map(PathBuf::from).ok()
 }
 
-// Get Sentinel Root Directory
-pub fn sentinel_root_dir() -> Option<PathBuf> {
-    user_home_dir().map(|p| p.join(".Sentinel"))
+// Get OpenDesktop Root Directory
+pub fn od_root_dir() -> Option<PathBuf> {
+    user_home_dir().map(|p| p.join("ProjectOpen").join("OpenDesktop"))
 }
 
-// Get Sentinel Addons Directory
-pub fn sentinel_addons_dir() -> Option<PathBuf> {
-    sentinel_root_dir().map(|p| p.join("Addons"))
+// Get OpenDesktop Addons Directory
+pub fn od_addons_dir() -> Option<PathBuf> {
+    od_root_dir().map(|p| p.join("Addons"))
 }
 
-// Get Sentinel Assets Directory
-pub fn sentinel_assets_dir() -> Option<PathBuf> {
-    sentinel_root_dir().map(|p| p.join("Assets"))
+// Get OpenDesktop Assets Directory
+pub fn od_assets_dir() -> Option<PathBuf> {
+    od_root_dir().map(|p| p.join("Assets"))
 }
 // --------------------------------

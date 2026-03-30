@@ -1,9 +1,10 @@
-// ~/Sentinel/sentinel-addons/windowmanager/src/main.rs
+// ~/OpenDesktop/od-addons/windowmanager/src/main.rs
 
 #![windows_subsystem = "windows"] 
 mod bootstrap;
 mod ipc_connector;
 
+pub mod installer;
 mod logging;
 mod layout;
 mod types;
@@ -13,14 +14,13 @@ mod config;
 mod utility;
 mod watchers;
 mod data_loaders;
-mod paths;
 
 use crate::{
     ipc_connector::request,
     data_loaders::yaml::load_yaml,
     config::UniversalConfig,
     watchers::yaml_watcher,
-    utility::{sentinel_addons_dir, sentinel_assets_dir},
+    utility::{od_addons_dir, od_assets_dir},
     types::{DisplayInfo, WindowManagerConfig},
     window_events::{
         event_manager::{
@@ -77,8 +77,8 @@ fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
    Initial Startup
    ========================= */
 fn check_assets() {
-    // Check if assets directory '~/.Sentinel/Assets/windowmanager' exists
-    if let Some(assets_dir) = sentinel_assets_dir() {
+    // Check if assets directory '~/ProjectOpen/OpenDesktop/Assets/windowmanager' exists
+    if let Some(assets_dir) = od_assets_dir() {
         let assets_dir = assets_dir.join(ADDON_NAME);
         if !assets_dir.exists() {
             info!("[{}] No assets directory found for Window Manager, creating default", DEBUG_NAME);
@@ -108,29 +108,37 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
-    logging::init(true, "info");
+    logging::init("OpenDesktop", "WindowManager", true);
     bootstrap::bootstrap_addon();
     initial_startup();
     let mut debug_enabled = false;
-    let mut log_level = "warn".to_string();
+    let mut _log_level = "warn".to_string();
     let mut window_manager_config = WindowManagerConfig::default();
     let mut universal_config = UniversalConfig::default();
     
-    if let Some(addons_dir) = sentinel_addons_dir() {
+    if let Some(addons_dir) = od_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
         if let Some(value) = load_yaml(&yaml_path) {
+            let settings = value.get("settings");
+            let development = settings.and_then(|s| s.get("development"));
+
             debug_enabled = value
                 .get("debug")
+                .or_else(|| development.and_then(|d| d.get("debug")))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            log_level = value
+            _log_level = value
                 .get("log_level")
+                .or_else(|| development.and_then(|d| d.get("log_level")))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_lowercase())
                 .unwrap_or_else(|| if debug_enabled { "info".to_string() } else { "warn".to_string() });
             
             // Load universal configuration from YAML
-            if let Some(universal_value) = value.get("universal") {
+            if let Some(universal_value) = settings
+                .and_then(|s| s.get("universal"))
+                .or_else(|| value.get("universal"))
+            {
                 if let Ok(config) = serde_yaml::from_value::<UniversalConfig>(universal_value.clone()) {
                     universal_config = config;
                     info!("[{}] Loaded universal config from YAML", DEBUG_NAME);
@@ -138,7 +146,10 @@ fn main() -> windows::core::Result<()> {
             }
             
             // Load window manager configuration from YAML
-            if let Some(wm_value) = value.get("window_manager") {
+            if let Some(wm_value) = settings
+                .and_then(|s| s.get("window_manager"))
+                .or_else(|| value.get("window_manager"))
+            {
                 if let Ok(config) = serde_yaml::from_value::<WindowManagerConfig>(wm_value.clone()) {
                     window_manager_config = config;
                     info!("[{}] Loaded window manager config from YAML", DEBUG_NAME);
@@ -219,7 +230,7 @@ fn main() -> windows::core::Result<()> {
             info!("[{}] Window Manager disabled in config - staying idle", DEBUG_NAME);
         }
 
-        if let Some(addons_dir) = sentinel_addons_dir() {
+        if let Some(addons_dir) = od_addons_dir() {
             let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
             yaml_watcher(&yaml_dir, || true);
         } else {
