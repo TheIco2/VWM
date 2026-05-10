@@ -1,8 +1,8 @@
-# 🪟 OpenDesktop Window Manager
+# 🪟 VEIL Window Manager
 
-![OpenDesktop Banner](https://img.shields.io/badge/OpenDesktop-WindowManager-blue) ![Rust](https://img.shields.io/badge/lang-Rust-orange) ![Windows](https://img.shields.io/badge/platform-Windows-brightgreen) ![Status](https://img.shields.io/badge/status-Beta-yellow)
+![VEIL Banner](https://img.shields.io/badge/VEIL-WindowManager-blue) ![Rust](https://img.shields.io/badge/lang-Rust-orange) ![Windows](https://img.shields.io/badge/platform-Windows-brightgreen) ![Status](https://img.shields.io/badge/status-Beta-yellow)
 
-**Dynamic, multi-monitor window management** for OpenDesktop — fast tiling, smooth animations, clean gaps, and **edge-drag resizing** in BSP layouts.
+**Dynamic, multi-monitor window management** for VEIL — fast tiling, smooth animations, clean gaps, and **edge-drag resizing** in BSP layouts.
 
 > ⚡ Modern tiling workflow with predictable placement, clean spacing, and per-monitor customization.
 
@@ -21,7 +21,7 @@
 | **Multi-Monitor Support** | Per-monitor layouts, smart boundary detection                               | ✅     |
 | **Window Filtering**      | Dimension, process, class, title filters, auto exclusions                   | ✅     |
 | **Hot-Reload Config**     | YAML updates live without restarting                                        | ✅     |
-| **IPC Integration**       | OpenDesktop IPC-aware for dynamic updates                                      | ✅     |
+| **IPC Integration**       | VEIL IPC-aware for dynamic updates                                          | ✅     |
 
 ---
 
@@ -70,7 +70,7 @@
 
 ## ⚙️ Configuration
 
-**Path:** `~/ProjectOpen/OpenDesktop/addons/windowmanager/config.yaml`
+**Path:** `~/ProjectOpen/VEIL/addons/windowmanager/config.yaml`
 
 <details>
 <summary>Click to expand YAML</summary>
@@ -152,7 +152,7 @@ window_manager:
 ## 🏗️ Architecture Overview
 
 ```pwsh
-OpenDesktop Window Manager
+VEIL Window Manager
 ┌───────────────┐
 │   main.rs     │ ← IPC & event loop
 ├───────────────┤
@@ -166,7 +166,7 @@ OpenDesktop Window Manager
 ├───────────────┤
 │  watchers.rs  │ ← Config hot-reload
 ├───────────────┤
-│ ipc_connector │ ← OpenDesktop IPC
+│ ipc_connector │ ← VEIL IPC
 └───────────────┘
 ```
 
@@ -207,4 +207,4 @@ OpenDesktop Window Manager
 cargo build --release
 ```
 
-**Output:** `target/release/od-windowmanager.exe`
+**Output:** `target/release/veil-windowmanager.exe`

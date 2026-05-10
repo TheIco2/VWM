@@ -5,7 +5,7 @@ use std::{
     path::PathBuf
 };
 
-// OpenDesktop Wide String Utilities
+// VEIL Wide String Utilities
 // --------------------------------
 
 // Utility function to convert &str to wide string (Vec<u16>)
@@ -25,7 +25,7 @@ pub fn _from_wstring(ws: &[u16]) -> String {
 
 
 
-// OpenDesktop Directory Utilities
+// VEIL Directory Utilities
 // --------------------------------
 
 // Get user home directory
@@ -33,18 +33,18 @@ pub fn user_home_dir() -> Option<PathBuf> {
     env::var("USERPROFILE").map(PathBuf::from).ok()
 }
 
-// Get OpenDesktop Root Directory
-pub fn od_root_dir() -> Option<PathBuf> {
-    user_home_dir().map(|p| p.join("ProjectOpen").join("OpenDesktop"))
+// Get VEIL Root Directory
+pub fn veil_root_dir() -> Option<PathBuf> {
+    user_home_dir().map(|p| p.join("ProjectOpen").join("VEIL"))
 }
 
-// Get OpenDesktop Addons Directory
-pub fn od_addons_dir() -> Option<PathBuf> {
-    od_root_dir().map(|p| p.join("Addons"))
+// Get VEIL Addons Directory
+pub fn veil_addons_dir() -> Option<PathBuf> {
+    veil_root_dir().map(|p| p.join("Addons"))
 }
 
-// Get OpenDesktop Assets Directory
-pub fn od_assets_dir() -> Option<PathBuf> {
-    od_root_dir().map(|p| p.join("Assets"))
+// Get VEIL Assets Directory
+pub fn veil_assets_dir() -> Option<PathBuf> {
+    veil_root_dir().map(|p| p.join("Assets"))
 }
 // --------------------------------

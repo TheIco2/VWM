@@ -1,4 +1,4 @@
-// ~/OpenDesktop/od-addons/windowmanager/src/main.rs
+// ~/VEIL/veil-addons/windowmanager/src/main.rs
 
 #![windows_subsystem = "windows"] 
 mod bootstrap;
@@ -20,7 +20,7 @@ use crate::{
     data_loaders::yaml::load_yaml,
     config::UniversalConfig,
     watchers::yaml_watcher,
-    utility::{od_addons_dir, od_assets_dir},
+    utility::{veil_addons_dir, veil_assets_dir},
     types::{DisplayInfo, WindowManagerConfig},
     window_events::{
         event_manager::{
@@ -77,8 +77,8 @@ fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
    Initial Startup
    ========================= */
 fn check_assets() {
-    // Check if assets directory '~/ProjectOpen/OpenDesktop/Assets/windowmanager' exists
-    if let Some(assets_dir) = od_assets_dir() {
+    // Check if assets directory '~/ProjectOpen/VEIL/Assets/windowmanager' exists
+    if let Some(assets_dir) = veil_assets_dir() {
         let assets_dir = assets_dir.join(ADDON_NAME);
         if !assets_dir.exists() {
             info!("[{}] No assets directory found for Window Manager, creating default", DEBUG_NAME);
@@ -108,7 +108,7 @@ pub fn initial_startup() {
    ========================= */
 
 fn main() -> windows::core::Result<()> {
-    logging::init("OpenDesktop", "WindowManager", true);
+    logging::init("VEIL", "WindowManager", true);
     bootstrap::bootstrap_addon();
     initial_startup();
     let mut debug_enabled = false;
@@ -116,7 +116,7 @@ fn main() -> windows::core::Result<()> {
     let mut window_manager_config = WindowManagerConfig::default();
     let mut universal_config = UniversalConfig::default();
     
-    if let Some(addons_dir) = od_addons_dir() {
+    if let Some(addons_dir) = veil_addons_dir() {
         let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
         if let Some(value) = load_yaml(&yaml_path) {
             let settings = value.get("settings");
@@ -230,7 +230,7 @@ fn main() -> windows::core::Result<()> {
             info!("[{}] Window Manager disabled in config - staying idle", DEBUG_NAME);
         }
 
-        if let Some(addons_dir) = od_addons_dir() {
+        if let Some(addons_dir) = veil_addons_dir() {
             let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
             yaml_watcher(&yaml_dir, || true);
         } else {

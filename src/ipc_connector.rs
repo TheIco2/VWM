@@ -1,4 +1,4 @@
-// ~/OpenDesktop/od-addons/windowmanager/src/ipc_connector.rs
+// ~/VEIL/veil-addons/windowmanager/src/ipc_connector.rs
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -35,10 +35,10 @@ fn is_win32_error(err: &windows::core::Error, win32_code: u32) -> bool {
     err.code() == HRESULT::from_win32(win32_code)
 }
 
-/// Sends a JSON IPC request to the OpenDesktop IPC server and returns the universal IpcResponse.
+/// Sends a JSON IPC request to the VEIL IPC server and returns the universal IpcResponse.
 fn send_ipc_request_once(req: &Value) -> Option<IpcResponse> {
     unsafe {
-        let name = to_wstring(r"\\.\pipe\opendesktop");
+        let name = to_wstring(r"\\.\pipe\veil");
         let pipe_name = PCWSTR(name.as_ptr());
 
         // Wait for server

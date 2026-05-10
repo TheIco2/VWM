@@ -1,10 +1,10 @@
 {
-    "id": "od.addon.windowmanager",
+    "id": "veil.addon.windowmanager",
     "name": "Window Manager",
     "package": "windowmanager",
-    "exe_path": "bin/od-windowmanager.exe",
+    "exe_path": "bin/veil-windowmanager.exe",
     "version": "1.0.0",
-    "repo": "https://github.com/The-Ico2/od-windowmanager",
+    "repo": "https://github.com/The-Ico2/veil-windowmanager",
     "author": {
         "Ico2": "https://github.com/The-Ico2"
     }

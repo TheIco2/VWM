@@ -1,42 +1,42 @@
-// ~/OpenDesktop/od-addons/windowmanager/src/bootstrap.rs
+// ~/VEIL/veil-addons/windowmanager/src/bootstrap.rs
 
 use std::fs;
 use std::path::PathBuf;
 use crate::ADDON_NAME;
 use crate::{info, warn};
 
-const EXE_NAME: &str = "od-windowmanager.exe";
+const EXE_NAME: &str = "veil-windowmanager.exe";
 
-/// Check if OpenDesktop.exe (the backend) is running; if not, start it.
+/// Check if VEIL.exe (the backend) is running; if not, start it.
 fn ensure_backend_running() {
-    info!("[{}] Checking if OpenDesktop.exe is running...", ADDON_NAME);
+    info!("[{}] Checking if VEIL.exe is running...", ADDON_NAME);
     let backend_running = std::process::Command::new("tasklist")
-        .args(["/FI", "IMAGENAME eq OpenDesktop.exe", "/NH"])
+        .args(["/FI", "IMAGENAME eq VEIL.exe", "/NH"])
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).contains("OpenDesktop.exe"))
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("VEIL.exe"))
         .unwrap_or(false);
 
     if backend_running {
-        info!("[{}] OpenDesktop.exe is already running", ADDON_NAME);
+        info!("[{}] VEIL.exe is already running", ADDON_NAME);
         return;
     }
 
-    warn!("[{}] OpenDesktop.exe is NOT running, attempting to start it", ADDON_NAME);
+    warn!("[{}] VEIL.exe is NOT running, attempting to start it", ADDON_NAME);
     let Some(home) = std::env::var("USERPROFILE").ok() else {
-        warn!("[{}] Cannot resolve USERPROFILE to find OpenDesktop.exe", ADDON_NAME);
+        warn!("[{}] Cannot resolve USERPROFILE to find VEIL.exe", ADDON_NAME);
         return;
     };
-    let backend_exe = PathBuf::from(&home).join("ProjectOpen").join("OpenDesktop").join("OpenDesktop.exe");
+    let backend_exe = PathBuf::from(&home).join("ProjectOpen").join("VEIL").join("VEIL.exe");
     if !backend_exe.exists() {
         warn!("[{}] Backend not found at {}", ADDON_NAME, backend_exe.display());
         return;
     }
     match std::process::Command::new(&backend_exe).spawn() {
         Ok(_) => {
-            info!("[{}] Started OpenDesktop.exe from {}", ADDON_NAME, backend_exe.display());
+            info!("[{}] Started VEIL.exe from {}", ADDON_NAME, backend_exe.display());
             std::thread::sleep(std::time::Duration::from_millis(1500));
         }
-        Err(e) => warn!("[{}] Failed to start OpenDesktop.exe: {e}", ADDON_NAME),
+        Err(e) => warn!("[{}] Failed to start VEIL.exe: {e}", ADDON_NAME),
     }
 }
 
@@ -46,7 +46,7 @@ pub fn bootstrap_addon() {
 
     ensure_backend_running();
 
-    let config = crate::installer::InstallerConfig::addon("OpenDesktop", ADDON_NAME)
+    let config = crate::installer::InstallerConfig::addon("VEIL", ADDON_NAME)
         .exe_name(EXE_NAME)
         .addon_subdirs(&["options"]);
 
@@ -77,12 +77,12 @@ fn scaffold_addon_json(addon_dir: &PathBuf) {
     if path.exists() { return; }
 
     let content = r#"{
-    "id": "od.addon.windowmanager",
+    "id": "veil.addon.windowmanager",
     "name": "Window Manager",
     "package": "windowmanager",
-    "exe_path": "bin/od-windowmanager.exe",
+    "exe_path": "bin/veil-windowmanager.exe",
     "version": "1.0.0",
-    "repo": "https://github.com/The-Ico2/od-windowmanager",
+    "repo": "https://github.com/The-Ico2/veil-windowmanager",
     "author": {
         "Ico2": "https://github.com/The-Ico2"
     }

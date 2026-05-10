@@ -1,9 +1,9 @@
 [package]
-name = "OpenDesktop-WindowManager"
+name = "VEIL-WindowManager"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ico2"]
-description = "OpenDesktop Tiling Window Manager"
+description = "VEIL Tiling Window Manager"
 license = "UNLICENSED"
 publish = false
 
