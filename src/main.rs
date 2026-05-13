@@ -2,6 +2,7 @@
 
 #![windows_subsystem = "windows"] 
 mod bootstrap;
+mod display_provider;
 mod ipc_connector;
 
 pub mod installer;
@@ -16,12 +17,12 @@ mod watchers;
 mod data_loaders;
 
 use crate::{
-    ipc_connector::request,
+    display_provider::get_displays,
     data_loaders::yaml::load_yaml,
     config::UniversalConfig,
     watchers::yaml_watcher,
     utility::{veil_addons_dir, veil_assets_dir},
-    types::{DisplayInfo, WindowManagerConfig},
+    types::WindowManagerConfig,
     window_events::{
         event_manager::{
             EventManager,
@@ -45,34 +46,25 @@ use windows::{
 pub const ADDON_NAME: &str = "windowmanager";
 pub const DEBUG_NAME: &str = "WINDOWMANAGER";
 
+fn standalone_mode() -> bool {
+    if cfg!(feature = "standalone-mode") {
+        return true;
+    }
+
+    let arg_enabled = std::env::args().any(|arg| arg.eq_ignore_ascii_case("--standalone"));
+    let env_enabled = std::env::var("VEIL_STANDALONE")
+        .map(|v| {
+            let normalized = v.trim().to_ascii_lowercase();
+            normalized == "1" || normalized == "true" || normalized == "yes"
+        })
+        .unwrap_or(false);
+
+    arg_enabled || env_enabled
+}
+
 /* =========================
    IPC MONITORS
    ========================= */
-fn ipc_get_displays() -> Option<Vec<DisplayInfo>> {
-    info!("[{}][IPC] Requesting monitors via pipe", DEBUG_NAME);
-
-    if let Some(resp) = request("sysdata", "get_displays", None) {
-        info!("[{}][IPC] Received IPC response, parsing JSON", DEBUG_NAME);
-        // Try to parse the JSON response into Vec<DisplayInfo>
-        match serde_json::from_str::<Vec<DisplayInfo>>(&resp) {
-            Ok(displays) => {
-                for (idx, display) in displays.iter().enumerate() {
-                    info!("[{}][IPC] Display {}: pos=({},{}), size={}x{}, primary={}", 
-                          DEBUG_NAME, idx, display.x, display.y, display.width, display.height, display.primary);
-                }
-                Some(displays)
-            },
-            Err(e) => {
-                error!("[{}][IPC] Failed to parse IPC response: {}", DEBUG_NAME, e);
-                None
-            }
-        }
-    } else {
-        warn!("[{}][IPC] No IPC response received", DEBUG_NAME);
-        None
-    }
-}
-
 /* =========================
    Initial Startup
    ========================= */
@@ -109,7 +101,14 @@ pub fn initial_startup() {
 
 fn main() -> windows::core::Result<()> {
     logging::init("VEIL", "WindowManager", true);
-    bootstrap::bootstrap_addon();
+    let standalone = standalone_mode();
+
+    if standalone {
+        info!("[{}] Running in standalone mode", DEBUG_NAME);
+    } else {
+        bootstrap::bootstrap_addon();
+    }
+
     initial_startup();
     let mut debug_enabled = false;
     let mut _log_level = "warn".to_string();
@@ -172,13 +171,9 @@ fn main() -> windows::core::Result<()> {
         let mut hooks: Option<Vec<HWINEVENTHOOK>> = None;
 
         if window_manager_config.enabled {
-            // get monitors from IPC
-            let ipc_displays = ipc_get_displays().unwrap_or_default();
-            // If DisplayInfo and MonitorInfo are the same, you can use DisplayInfo directly.
-            // Otherwise, convert DisplayInfo to MonitorInfo as needed.
-            let monitors: Vec<DisplayInfo> = ipc_displays.into_iter().collect();
+            let monitors = get_displays(standalone);
             if monitors.is_empty() {
-                error!("[{}] No monitors received from IPC", DEBUG_NAME);
+                error!("[{}] No monitors available (IPC/local lookup failed)", DEBUG_NAME);
                 return Ok(());
             }
 
