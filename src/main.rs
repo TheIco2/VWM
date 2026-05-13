@@ -21,7 +21,7 @@ use crate::{
     data_loaders::yaml::load_yaml,
     config::UniversalConfig,
     watchers::yaml_watcher,
-    utility::{veil_addons_dir, veil_assets_dir},
+    utility::{standalone_app_dir, veil_addons_dir, veil_assets_dir},
     types::WindowManagerConfig,
     window_events::{
         event_manager::{
@@ -69,7 +69,7 @@ fn standalone_mode() -> bool {
    Initial Startup
    ========================= */
 fn check_assets() {
-    // Check if assets directory '~/ProjectOpen/VEIL/Assets/windowmanager' exists
+    // Check if assets directory '~/VEIL/Core/Assets/windowmanager' exists
     if let Some(assets_dir) = veil_assets_dir() {
         let assets_dir = assets_dir.join(ADDON_NAME);
         if !assets_dir.exists() {
@@ -105,6 +105,7 @@ fn main() -> windows::core::Result<()> {
 
     if standalone {
         info!("[{}] Running in standalone mode", DEBUG_NAME);
+        bootstrap::bootstrap_standalone();
     } else {
         bootstrap::bootstrap_addon();
     }
@@ -114,9 +115,14 @@ fn main() -> windows::core::Result<()> {
     let mut _log_level = "warn".to_string();
     let mut window_manager_config = WindowManagerConfig::default();
     let mut universal_config = UniversalConfig::default();
-    
-    if let Some(addons_dir) = veil_addons_dir() {
-        let yaml_path = addons_dir.join(ADDON_NAME).join("config.yaml");
+
+    let yaml_path = if standalone {
+        standalone_app_dir("WindowManager").map(|p| p.join("config.yaml"))
+    } else {
+        veil_addons_dir().map(|p| p.join(ADDON_NAME).join("config.yaml"))
+    };
+
+    if let Some(yaml_path) = yaml_path {
         if let Some(value) = load_yaml(&yaml_path) {
             let settings = value.get("settings");
             let development = settings.and_then(|s| s.get("development"));
@@ -225,11 +231,15 @@ fn main() -> windows::core::Result<()> {
             info!("[{}] Window Manager disabled in config - staying idle", DEBUG_NAME);
         }
 
-        if let Some(addons_dir) = veil_addons_dir() {
-            let yaml_dir = addons_dir.join("windowmanager").join("config.yaml");
-            yaml_watcher(&yaml_dir, || true);
+        let watch_path = if standalone {
+            standalone_app_dir("WindowManager").map(|p| p.join("config.yaml"))
         } else {
-            error!("[{}] Failed to get addons directory", DEBUG_NAME);
+            veil_addons_dir().map(|p| p.join("windowmanager").join("config.yaml"))
+        };
+        if let Some(watch_path) = watch_path {
+            yaml_watcher(&watch_path, standalone);
+        } else {
+            error!("[{}] Failed to resolve config path", DEBUG_NAME);
         }
 
         let mut msg: MSG = std::mem::zeroed();

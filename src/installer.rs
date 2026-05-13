@@ -50,6 +50,8 @@ pub enum ComponentKind {
     Core,
     /// An addon that lives under `<root>/Addons/<addon_name>/bin/`.
     Addon { name: String },
+    /// A standalone addon binary that lives beside Core: `<veil_root>/<name>/`.
+    Standalone { name: String },
 }
 
 /// Configuration for the self-installer.
@@ -99,6 +101,18 @@ impl InstallerConfig {
         Self {
             app_name: app_name.to_string(),
             kind: ComponentKind::Addon { name: addon_name.to_string() },
+            exe_name: None,
+            subdirs: Vec::new(),
+            self_install: true,
+            exit_after_relaunch: true,
+        }
+    }
+
+    /// Create a config for a standalone addon binary.
+    pub fn standalone(app_name: &str, standalone_name: &str) -> Self {
+        Self {
+            app_name: app_name.to_string(),
+            kind: ComponentKind::Standalone { name: standalone_name.to_string() },
             exe_name: None,
             subdirs: Vec::new(),
             self_install: true,
@@ -178,9 +192,22 @@ pub fn user_home_dir() -> Option<PathBuf> {
     }
 }
 
-/// Resolve the canonical app root: `~/ProjectOpen/<app_name>/`.
+/// Resolve the canonical app root.
+///
+/// For VEIL:
+/// - Core root: `~/VEIL/Core/`
+/// - Addons root: `~/VEIL/Core/Addons/`
+///
+/// For non-VEIL apps we keep the legacy layout:
+/// - `~/ProjectOpen/<app_name>/`
 pub fn app_root(app_name: &str) -> Option<PathBuf> {
-    user_home_dir().map(|home| home.join("ProjectOpen").join(app_name))
+    user_home_dir().map(|home| {
+        if app_name.eq_ignore_ascii_case("VEIL") {
+            home.join("VEIL").join("Core")
+        } else {
+            home.join("ProjectOpen").join(app_name)
+        }
+    })
 }
 
 /// Resolve the install directory for a given config.
@@ -191,6 +218,13 @@ pub fn install_dir(config: &InstallerConfig) -> Option<PathBuf> {
     match &config.kind {
         ComponentKind::Core => Some(root),
         ComponentKind::Addon { name } => Some(root.join("Addons").join(name)),
+        ComponentKind::Standalone { name } => {
+            if config.app_name.eq_ignore_ascii_case("VEIL") {
+                Some(root.parent().map(|p| p.join(name)).unwrap_or_else(|| root.join(name)))
+            } else {
+                Some(root.join(name))
+            }
+        }
     }
 }
 
@@ -200,7 +234,7 @@ pub fn install_dir(config: &InstallerConfig) -> Option<PathBuf> {
 pub fn exe_dir(config: &InstallerConfig) -> Option<PathBuf> {
     let dir = install_dir(config)?;
     match &config.kind {
-        ComponentKind::Core => Some(dir),
+        ComponentKind::Core | ComponentKind::Standalone { .. } => Some(dir),
         ComponentKind::Addon { .. } => Some(dir.join("bin")),
     }
 }
@@ -217,9 +251,15 @@ pub fn is_installed(config: &InstallerConfig) -> bool {
     }
 }
 
-/// Resolve the logs directory: `~/ProjectOpen/.Logs/<app_name>/`.
+/// Resolve the logs directory.
 pub fn logs_dir(app_name: &str) -> Option<PathBuf> {
-    user_home_dir().map(|home| home.join("ProjectOpen").join(".Logs").join(app_name))
+    user_home_dir().map(|home| {
+        if app_name.eq_ignore_ascii_case("VEIL") {
+            home.join("VEIL").join("Core").join("logs")
+        } else {
+            home.join("ProjectOpen").join(".Logs").join(app_name)
+        }
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -35,7 +35,12 @@ pub fn user_home_dir() -> Option<PathBuf> {
 
 // Get VEIL Root Directory
 pub fn veil_root_dir() -> Option<PathBuf> {
-    user_home_dir().map(|p| p.join("ProjectOpen").join("VEIL"))
+    user_home_dir().map(|p| p.join("VEIL").join("Core"))
+}
+
+// Get VEIL Base Directory (contains Core and standalone addon folders)
+pub fn veil_base_dir() -> Option<PathBuf> {
+    user_home_dir().map(|p| p.join("VEIL"))
 }
 
 // Get VEIL Addons Directory
@@ -46,5 +51,10 @@ pub fn veil_addons_dir() -> Option<PathBuf> {
 // Get VEIL Assets Directory
 pub fn veil_assets_dir() -> Option<PathBuf> {
     veil_root_dir().map(|p| p.join("Assets"))
+}
+
+// Get standalone app directory (e.g. ~/VEIL/WindowManager)
+pub fn standalone_app_dir(app_name: &str) -> Option<PathBuf> {
+    veil_base_dir().map(|p| p.join(app_name))
 }
 // --------------------------------

@@ -6,6 +6,9 @@ use crate::ADDON_NAME;
 use crate::{info, warn};
 
 const EXE_NAME: &str = "veil-windowmanager.exe";
+const STANDALONE_EXE_NAME: &str = "vwm-s.exe";
+const STANDALONE_APP_FOLDER: &str = "WindowManager";
+const START_MENU_LINK_NAME: &str = "Window Manager.lnk";
 
 /// Check if VEIL.exe (the backend) is running; if not, start it.
 fn ensure_backend_running() {
@@ -26,7 +29,7 @@ fn ensure_backend_running() {
         warn!("[{}] Cannot resolve USERPROFILE to find VEIL.exe", ADDON_NAME);
         return;
     };
-    let backend_exe = PathBuf::from(&home).join("ProjectOpen").join("VEIL").join("VEIL.exe");
+    let backend_exe = PathBuf::from(&home).join("VEIL").join("Core").join("VEIL.exe");
     if !backend_exe.exists() {
         warn!("[{}] Backend not found at {}", ADDON_NAME, backend_exe.display());
         return;
@@ -70,6 +73,242 @@ pub fn bootstrap_addon() {
         }
     }
     crate::installer::bootstrap(&config, log_fn);
+}
+
+  pub fn bootstrap_standalone() {
+    info!("[{}] === Standalone bootstrap starting ===", ADDON_NAME);
+    info!("[{}] Current exe: {:?}", ADDON_NAME, std::env::current_exe());
+
+    let config = crate::installer::InstallerConfig::standalone("VEIL", STANDALONE_APP_FOLDER)
+      .exe_name(STANDALONE_EXE_NAME)
+      .no_exit_after_relaunch();
+
+    if let Some(standalone_dir) = crate::installer::install_dir(&config) {
+      scaffold_info_json(&standalone_dir);
+      scaffold_standalone_config_yaml(&standalone_dir);
+      info!("[{}] Standalone scaffolding complete", ADDON_NAME);
+    }
+
+    fn log_fn(level: crate::installer::LogLevel, msg: &str) {
+      match level {
+        crate::installer::LogLevel::Info  => crate::info!("{}", msg),
+        crate::installer::LogLevel::Warn  => crate::warn!("{}", msg),
+        crate::installer::LogLevel::Error => crate::error!("{}", msg),
+      }
+    }
+
+    let result = crate::installer::bootstrap(&config, log_fn);
+
+    if let Some(standalone_dir) = crate::installer::install_dir(&config) {
+      let target_exe = standalone_dir.join(STANDALONE_EXE_NAME);
+      ensure_start_menu_shortcut(&target_exe, &standalone_dir);
+
+      let run_on_startup = read_run_on_startup(&standalone_dir.join("config.yaml"));
+      ensure_startup_shortcut(&target_exe, &standalone_dir, run_on_startup);
+    }
+
+    if matches!(result, crate::installer::BootstrapResult::Relaunched) {
+      std::process::exit(0);
+    }
+  }
+
+  fn read_run_on_startup(config_path: &PathBuf) -> bool {
+    let Ok(text) = fs::read_to_string(config_path) else {
+      return true;
+    };
+
+    let Ok(value) = serde_yaml::from_str::<serde_yaml::Value>(&text) else {
+      return true;
+    };
+
+    value
+      .get("settings")
+      .and_then(|s| s.get("run_on_startup"))
+      .and_then(|v| v.as_bool())
+      .or_else(|| value.get("run_on_startup").and_then(|v| v.as_bool()))
+      .unwrap_or(true)
+  }
+
+  fn ensure_start_menu_shortcut(target_exe: &PathBuf, working_dir: &PathBuf) {
+    let appdata = match std::env::var("APPDATA") {
+      Ok(v) => PathBuf::from(v),
+      Err(_) => return,
+    };
+
+    let start_menu_dir = appdata.join("Microsoft").join("Windows").join("Start Menu").join("Programs").join("VEIL");
+    if let Err(e) = std::fs::create_dir_all(&start_menu_dir) {
+      warn!("[{}] Failed to create Start Menu directory '{}': {}", ADDON_NAME, start_menu_dir.display(), e);
+      return;
+    }
+
+    let shortcut_path = start_menu_dir.join(START_MENU_LINK_NAME);
+    if create_windows_shortcut(&shortcut_path, target_exe, working_dir, "VEIL Window Manager") {
+      info!("[{}] Ensured Start Menu shortcut at {}", ADDON_NAME, shortcut_path.display());
+    }
+  }
+
+  fn ensure_startup_shortcut(target_exe: &PathBuf, working_dir: &PathBuf, enabled: bool) {
+    let appdata = match std::env::var("APPDATA") {
+      Ok(v) => PathBuf::from(v),
+      Err(_) => return,
+    };
+
+    let startup_dir = appdata
+      .join("Microsoft")
+      .join("Windows")
+      .join("Start Menu")
+      .join("Programs")
+      .join("Startup");
+
+    if let Err(e) = std::fs::create_dir_all(&startup_dir) {
+      warn!("[{}] Failed to create Startup directory '{}': {}", ADDON_NAME, startup_dir.display(), e);
+      return;
+    }
+
+    let shortcut_path = startup_dir.join(START_MENU_LINK_NAME);
+
+    if enabled {
+      if create_windows_shortcut(&shortcut_path, target_exe, working_dir, "VEIL Window Manager") {
+        info!("[{}] run_on_startup=true; ensured Startup shortcut at {}", ADDON_NAME, shortcut_path.display());
+      }
+    } else if shortcut_path.exists() {
+      match std::fs::remove_file(&shortcut_path) {
+        Ok(_) => info!("[{}] run_on_startup=false; removed Startup shortcut at {}", ADDON_NAME, shortcut_path.display()),
+        Err(e) => warn!("[{}] Failed removing Startup shortcut '{}': {}", ADDON_NAME, shortcut_path.display(), e),
+      }
+    }
+  }
+
+  fn ps_quote(value: &str) -> String {
+    value.replace('\'', "''")
+  }
+
+  fn create_windows_shortcut(shortcut_path: &PathBuf, target_exe: &PathBuf, working_dir: &PathBuf, description: &str) -> bool {
+    let shortcut = ps_quote(&shortcut_path.display().to_string());
+    let target = ps_quote(&target_exe.display().to_string());
+    let working = ps_quote(&working_dir.display().to_string());
+    let desc = ps_quote(description);
+
+    let command = format!(
+      "$WshShell = New-Object -ComObject WScript.Shell; \
+       $Shortcut = $WshShell.CreateShortcut('{}'); \
+       $Shortcut.TargetPath = '{}'; \
+       $Shortcut.WorkingDirectory = '{}'; \
+       $Shortcut.Description = '{}'; \
+       $Shortcut.Save();",
+      shortcut, target, working, desc
+    );
+
+    match std::process::Command::new("powershell")
+      .arg("-NoProfile")
+      .arg("-NonInteractive")
+      .arg("-ExecutionPolicy")
+      .arg("Bypass")
+      .arg("-Command")
+      .arg(command)
+      .status()
+    {
+      Ok(status) if status.success() => true,
+      Ok(status) => {
+        warn!("[{}] Shortcut creation PowerShell exited with status {}", ADDON_NAME, status);
+        false
+      }
+      Err(e) => {
+        warn!("[{}] Failed to run PowerShell for shortcut creation: {}", ADDON_NAME, e);
+        false
+      }
+    }
+  }
+
+fn scaffold_info_json(standalone_dir: &PathBuf) {
+    let path = standalone_dir.join("info.json");
+    if path.exists() { return; }
+
+    let content = r#"{
+    "id": "veil.app.windowmanager",
+    "name": "Window Manager",
+    "package": "windowmanager",
+    "exe_path": "bin/vwm-s.exe",
+    "version": "1.0.0",
+    "repo": "https://github.com/The-Ico2/VWM",
+    "authors": {
+        "Ico2": "https://github.com/The-Ico2"
+    }
+}
+"#;
+    match fs::write(&path, content) {
+        Ok(_) => info!("[{}] Created info.json", ADDON_NAME),
+        Err(e) => warn!("[{}] Failed to create info.json: {e}", ADDON_NAME),
+    }
+}
+
+fn scaffold_standalone_config_yaml(standalone_dir: &PathBuf) {
+    let path = standalone_dir.join("config.yaml");
+    if path.exists() { return; }
+
+    let content = r#"settings:
+  update_check: true
+    debug: false
+    log_level: warn
+    run_on_startup: true
+
+  universal:
+    exclude_processes:
+      - "ShellExperienceHost.exe"
+      - "taskmgr.exe"
+      - "explorer.exe"
+      - "systemsettings.exe"
+      - "steamwebhelper.exe"
+      - "msiexec.exe"
+
+  window_manager:
+    enabled: true
+    manager_type: tiling
+    monitor_index:
+      - "*"
+    animation:
+      enabled: true
+      duration: 150
+    styling:
+      gap:
+        space: 10
+        behavior: "Shared"
+    events:
+      debounce_ms: 500
+
+    filters:
+      min_width: 1
+      min_height: 1
+
+      include_processes: []
+
+      exclude_processes:
+        - "ShellExperienceHost.exe"
+        - "taskmgr.exe"
+        - "explorer.exe"
+        - "systemsettings.exe"
+        - "steamwebhelper.exe"
+        - "msiexec.exe"
+
+      exclude_classes:
+        - "Shell_TrayWnd"
+        - "Progman"
+        - "WorkerW"
+        - "Windows.UI.Core"
+        - "ApplicationFrameWindow"
+
+      exclude_titles:
+        - "Program Manager"
+        - "NVIDIA GeForce Overlay"
+        - "Windows Input Experience"
+        - "Task Manager"
+        - "Settings"
+        - "PowerToys Quick Access"
+"#;
+    match fs::write(&path, content) {
+        Ok(_) => info!("[{}] Created standalone config.yaml", ADDON_NAME),
+        Err(e) => warn!("[{}] Failed to create standalone config.yaml: {e}", ADDON_NAME),
+    }
 }
 
 fn scaffold_addon_json(addon_dir: &PathBuf) {

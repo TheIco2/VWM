@@ -1,7 +1,7 @@
-// logging.rs — Universal drop-in logger for ProjectOpen applications.
+// logging.rs — Universal drop-in logger for VEIL applications.
 //
 // Logs are written to:
-//   ~/ProjectOpen/.Logs/<app_name>/<segment>/<date>_<app_name>_<segment>.log
+//   ~/VEIL/.logs/<app_name>/<segment>/<date>_<app_name>_<segment>.log
 //
 // A new log file is created each day. The background writer thread handles
 // I/O so logging never blocks the main/render thread.
@@ -187,7 +187,7 @@ macro_rules! error {
 // ---------------------------------------------------------------------------
 
 /// Resolve the logs base directory:
-/// `~/ProjectOpen/.Logs/<app_name>/<segment>/`
+/// `~/VEIL/.logs/<app_name>/<segment>/`
 fn logs_dir(app_name: &str, segment: &str) -> PathBuf {
     let home = std::env::var("USERPROFILE")
         .ok()
@@ -205,8 +205,8 @@ fn logs_dir(app_name: &str, segment: &str) -> PathBuf {
                 .unwrap_or_else(|| PathBuf::from("."))
         });
 
-    home.join("ProjectOpen")
-        .join(".Logs")
+    home.join("VEIL")
+        .join(".logs")
         .join(app_name)
         .join(segment)
 }

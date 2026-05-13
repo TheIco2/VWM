@@ -1,5 +1,5 @@
 [package]
-name = "VEIL-WindowManager"
+name = "VWM"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ico2"]
@@ -14,12 +14,12 @@ standalone-mode = []
 ui-runtime = ["dep:webview2-com", "dep:wry", "dep:raw-window-handle", "dep:tao"]
 
 [[bin]]
-name = "veil-windowmanager-addon"
+name = "vwm-a"
 path = "src/main.rs"
 required-features = ["addon-mode"]
 
 [[bin]]
-name = "veil-windowmanager-standalone"
+name = "vwm-s"
 path = "src/main.rs"
 required-features = ["standalone-mode"]
 
