@@ -357,6 +357,45 @@ code {
   text-transform: uppercase;
 }
 
+/* ── Roadmap ──────────────────────────────────────────────── */
+.roadmap-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.roadmap-version {
+  display: inline-flex;
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid rgba(79, 142, 247, 0.22);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  margin-bottom: 0.75rem;
+}
+.roadmap-list {
+  list-style: none;
+  margin-top: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.roadmap-list li {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+.roadmap-list li::before {
+  content: '•';
+  color: var(--accent);
+  line-height: 1.1;
+}
+
 /* ── Layouts ───────────────────────────────────────────────── */
 .layouts { background: var(--bg-base); }
 .layout-tabs {

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roadmap — VEIL Window Manager</title>
+  <meta name="description" content="Major version roadmap for VEIL Window Manager, including v1.x stabilization and future v2/v3 goals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar" aria-label="Main navigation">
+    <div class="container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-badge">VEIL</span>
+        Window Manager
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#layouts">Layouts</a></li>
+        <li><a href="index.html#config">Config</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="roadmap.html" class="active">Roadmap</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://github.com/TheIco2/VWM" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+        <a href="index.html#install" class="btn btn-primary">Get Started</a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="nav-mobile" aria-hidden="true">
+    <a href="index.html#features">Features</a>
+    <a href="index.html#layouts">Layouts</a>
+    <a href="index.html#config">Config</a>
+    <a href="docs.html">Docs</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <main>
+    <section class="hero" id="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container">
+        <div class="hero-eyebrow">
+          <span class="dot"></span>
+          Product Direction
+        </div>
+        <h1>VWM Major Version<br/><span>Roadmap</span></h1>
+        <p class="subtitle">
+          This page tracks major goals across versions. Items can move as priorities change,
+          but this is the current direction for Window Manager.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Timeline</span>
+          <h2>Major version goals</h2>
+          <p>Focus areas by release generation.</p>
+        </div>
+
+        <div class="features-grid">
+          <article class="feature-card roadmap-card">
+            <div class="roadmap-version">v1.x</div>
+            <h3>Stability & Ecosystem</h3>
+            <p>Polish core behavior, reduce edge-case glitches, and improve onboarding/documentation.</p>
+            <ul class="roadmap-list">
+              <li>Fix edge cases in resize + drag reorder behavior</li>
+              <li>Improve standalone binary parity with addon mode</li>
+              <li>Expand docs with troubleshooting and recipes</li>
+              <li>Add migration notes for config changes</li>
+            </ul>
+            <span class="badge-done">In Progress</span>
+          </article>
+
+          <article class="feature-card roadmap-card">
+            <div class="roadmap-version">v2.x</div>
+            <h3>Workflow Power Features</h3>
+            <p>Introduce advanced controls for power users and multi-monitor heavy setups.</p>
+            <ul class="roadmap-list">
+              <li>Named workspaces and layout presets</li>
+              <li>Per-monitor profile switching</li>
+              <li>Expanded IPC commands and event hooks</li>
+              <li>Optional keybind-focused control layer</li>
+            </ul>
+            <span class="badge-done">Planned</span>
+          </article>
+
+          <article class="feature-card roadmap-card">
+            <div class="roadmap-version">v3.x</div>
+            <h3>Automation & Intelligence</h3>
+            <p>Smarter placement and automation rules tuned for specific app workflows.</p>
+            <ul class="roadmap-list">
+              <li>Rule-based initial placement by app/title/class</li>
+              <li>Session-aware restore of monitor/layout state</li>
+              <li>Profile-driven behavior packs for work/gaming/streaming</li>
+              <li>Telemetry-free local usage insights for tuning</li>
+            </ul>
+            <span class="badge-done">Exploration</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section config-section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Release Policy</span>
+          <h2>How this roadmap is used</h2>
+          <p>Roadmap items are directional commitments, not hard dates.</p>
+        </div>
+        <div class="config-grid">
+          <div>
+            <table class="config-table">
+              <thead>
+                <tr><th>Label</th><th>Meaning</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>In Progress</td><td>Actively being worked on in current cycle</td></tr>
+                <tr><td>Planned</td><td>Accepted and scoped for a future major/minor release</td></tr>
+                <tr><td>Exploration</td><td>Research stage, can change significantly before implementation</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="note-box">
+            <strong>Contributions welcome:</strong> if you want to influence priorities,
+            open a discussion or issue with your workflow pain points. Real usage feedback
+            is the biggest driver for roadmap order.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span class="footer-brand">
+          <span class="brand-badge" style="font-size:0.65rem;padding:2px 6px">VEIL</span>
+          Window Manager
+        </span>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="index.html">Home</a>
+          <a href="docs.html">Docs</a>
+          <a href="roadmap.html">Roadmap</a>
+          <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <span>MIT License &nbsp;·&nbsp; Built with Rust</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
