@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VEIL Window Manager — Dynamic Tiling for Windows</title>
+  <meta name="description" content="Fast tiling, smooth animations, edge-drag resizing, and per-monitor BSP layouts for Windows. Built in Rust for VEIL." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navbar ──────────────────────────────────────────── -->
+  <nav class="navbar" aria-label="Main navigation">
+    <div class="container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-badge">VEIL</span>
+        Window Manager
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="#features"  class="active">Features</a></li>
+        <li><a href="#layouts">Layouts</a></li>
+        <li><a href="#config">Config</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="docs.html">Docs</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://github.com/TheIco2/VWM" class="btn btn-ghost" target="_blank" rel="noopener">
+          GitHub
+        </a>
+        <a href="#install" class="btn btn-primary">Get Started</a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile nav -->
+  <div class="nav-mobile" aria-hidden="true">
+    <a href="#features">Features</a>
+    <a href="#layouts">Layouts</a>
+    <a href="#config">Config</a>
+    <a href="#install">Install</a>
+    <a href="docs.html">Docs</a>
+    <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <main>
+
+    <!-- ── Hero ──────────────────────────────────────────── -->
+    <section class="hero" id="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
+      <div class="hero-glow"  aria-hidden="true"></div>
+      <div class="container">
+        <div class="hero-eyebrow">
+          <span class="dot"></span>
+          VEIL Addon &nbsp;·&nbsp; Beta
+        </div>
+        <h1>Dynamic window tiling<br/><span>built for Windows.</span></h1>
+        <p class="subtitle">
+          BSP tiling layouts, edge-drag resizing, smooth animations, and per-monitor
+          customization — all hot-reloaded from a single YAML config.
+        </p>
+        <div class="hero-cta">
+          <a href="#install" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Get Started
+          </a>
+          <a href="docs.html" class="btn btn-ghost">Read the Docs</a>
+          <a href="https://github.com/TheIco2/VWM" class="btn btn-ghost" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.021C22 6.484 17.522 2 12 2z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-label">Language</div>
+            <div class="hero-stat-value">Rust</div>
+          </div>
+          <div>
+            <div class="hero-stat-label">Platform</div>
+            <div class="hero-stat-value">Windows</div>
+          </div>
+          <div>
+            <div class="hero-stat-label">Layouts</div>
+            <div class="hero-stat-value">3</div>
+          </div>
+          <div>
+            <div class="hero-stat-label">Config</div>
+            <div class="hero-stat-value">Hot-Reload</div>
+          </div>
+        </div>
+
+        <!-- Window diagram -->
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-bar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-amber"></span>
+            <span class="dot dot-green"></span>
+            <span class="title-text">BSP Tiling Layout — Monitor 0</span>
+          </div>
+          <div class="bsp-diagram">
+            <div class="win-tile span-col-start">
+              <div class="win-tile-bar"><span class="wdot"></span><span class="wdot"></span><span class="wdot"></span></div>
+              <div class="win-tile-lines">
+                <div class="win-tile-line accent"></div>
+                <div class="win-tile-line"></div>
+                <div class="win-tile-line"></div>
+                <div class="win-tile-line" style="width:40%"></div>
+              </div>
+            </div>
+            <div class="win-tile top-right">
+              <div class="win-tile-bar"><span class="wdot"></span><span class="wdot"></span><span class="wdot"></span></div>
+              <div class="win-tile-lines">
+                <div class="win-tile-line accent"></div>
+                <div class="win-tile-line"></div>
+              </div>
+            </div>
+            <div class="win-tile bottom-right-a">
+              <div class="win-tile-bar"><span class="wdot"></span><span class="wdot"></span><span class="wdot"></span></div>
+              <div class="win-tile-lines">
+                <div class="win-tile-line"></div>
+                <div class="win-tile-line accent"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Features ──────────────────────────────────────── -->
+    <section class="features section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Features</span>
+          <h2>Everything you need for<br/>a tiling workflow</h2>
+          <p>A full-featured window manager shipped as a lightweight VEIL addon.</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">⬛</div>
+            <h3>BSP Tiling Layout</h3>
+            <p>Automatic binary-space-partition arrangement with drag-to-reorder and per-monitor state.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🪟</div>
+            <h3>Floating Layout</h3>
+            <p>Natural freeform window positions for when you need to step outside the grid.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📋</div>
+            <h3>Stacking Layout</h3>
+            <p>Focused full-screen stack of windows — quick single-app mode with instant switching.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">↔️</div>
+            <h3>Edge-Drag Resizing</h3>
+            <p>Resize any window by dragging its edge while the BSP tree stays intact and neighbors adapt.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">✨</div>
+            <h3>Smooth Animations</h3>
+            <p>Configurable duration animations on every tile operation — or disable them entirely.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⬜</div>
+            <h3>Gap Management</h3>
+            <p>Per-window or shared gap mode with a single pixel value. Clean, consistent spacing.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🖥️</div>
+            <h3>Multi-Monitor Support</h3>
+            <p>Independent BSP state per monitor with intelligent boundary detection and topology adaptation.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h3>Window Filtering</h3>
+            <p>Exclude by process, class, or title. Automatic filtering of hidden, cloaked, and popup windows.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <h3>Hot-Reload Config</h3>
+            <p>YAML config updates are applied live — no restart required. File-watcher powered.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔗</div>
+            <h3>VEIL IPC Integration</h3>
+            <p>Deeply integrated with the VEIL IPC layer for dynamic updates and addon communication.</p>
+            <span class="badge-done">Stable</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Layouts ────────────────────────────────────────── -->
+    <section class="layouts section" id="layouts">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Layouts</span>
+          <h2>Three layouts, one config</h2>
+          <p>Switch between tiling, floating, and stacking with a single config value.</p>
+        </div>
+
+        <div class="layout-tabs" role="tablist">
+          <button class="layout-tab active" role="tab" aria-selected="true"  data-tab="tab-bsp">   BSP Tiling</button>
+          <button class="layout-tab"        role="tab" aria-selected="false" data-tab="tab-float"> Floating</button>
+          <button class="layout-tab"        role="tab" aria-selected="false" data-tab="tab-stack"> Stacking</button>
+        </div>
+
+        <!-- BSP -->
+        <div class="layout-panel active" id="tab-bsp" role="tabpanel">
+          <div class="layout-desc">
+            <h3>Binary Space Partitioning</h3>
+            <p>Windows are recursively split across the available screen space. Each new window divides the focused tile in half, creating a perfectly balanced tree.</p>
+            <ul>
+              <li>Drag windows to reorder and swap positions</li>
+              <li>Edge-drag to resize while keeping tree integrity</li>
+              <li>Independent BSP state per monitor</li>
+              <li>Configurable gaps and animation duration</li>
+            </ul>
+          </div>
+          <div class="layout-preview">
+            <div class="layout-preview-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-amber"></span>
+              <span class="dot dot-green"></span>
+              manager_type: tiling
+            </div>
+            <div class="layout-canvas canvas-bsp">
+              <div class="canvas-tile w1">
+                <div class="t-bar"><span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span></div>
+                <div class="t-line a"></div><div class="t-line"></div><div class="t-line"></div>
+              </div>
+              <div class="canvas-tile w2">
+                <div class="t-bar"><span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span></div>
+                <div class="t-line a"></div><div class="t-line"></div>
+              </div>
+              <div class="canvas-tile w3">
+                <div class="t-bar"><span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span></div>
+                <div class="t-line"></div><div class="t-line a"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating -->
+        <div class="layout-panel" id="tab-float" role="tabpanel">
+          <div class="layout-desc">
+            <h3>Floating</h3>
+            <p>Windows retain their natural positions and sizes. No automatic tiling occurs — ideal for workflows that need freeform window placement.</p>
+            <ul>
+              <li>Zero layout interference</li>
+              <li>Windows stay where you put them</li>
+              <li>Filters and exclusions still apply</li>
+              <li>Toggle per monitor</li>
+            </ul>
+          </div>
+          <div class="layout-preview">
+            <div class="layout-preview-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-amber"></span>
+              <span class="dot dot-green"></span>
+              manager_type: floating
+            </div>
+            <div class="layout-canvas canvas-float">
+              <div class="float-win" style="top:12px;left:10px;width:54%;height:90px;">
+                <div class="float-win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+              </div>
+              <div class="float-win" style="top:30px;left:40%;width:52%;height:80px;">
+                <div class="float-win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+              </div>
+              <div class="float-win" style="top:120px;left:20%;width:40%;height:70px;">
+                <div class="float-win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stacking -->
+        <div class="layout-panel" id="tab-stack" role="tabpanel">
+          <div class="layout-desc">
+            <h3>Stacking</h3>
+            <p>All managed windows are stacked full-screen in the same position. Focus one at a time for a distraction-free, task-switching workflow.</p>
+            <ul>
+              <li>All windows occupy the full work area</li>
+              <li>Instant focus switching between apps</li>
+              <li>Great for single-monitor deep work</li>
+              <li>Combined with IPC for programmatic switching</li>
+            </ul>
+          </div>
+          <div class="layout-preview">
+            <div class="layout-preview-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-amber"></span>
+              <span class="dot dot-green"></span>
+              manager_type: stacking
+            </div>
+            <div class="layout-canvas canvas-stack">
+              <div class="canvas-tile focused">
+                <div class="t-bar"><span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span></div>
+                <div class="t-line a"></div><div class="t-line"></div>
+              </div>
+              <div class="canvas-tile">
+                <div class="t-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                <div class="t-line"></div>
+              </div>
+              <div class="canvas-tile">
+                <div class="t-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                <div class="t-line"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Config ─────────────────────────────────────────── -->
+    <section class="config-section section" id="config">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Configuration</span>
+          <h2>One YAML file, everything live</h2>
+          <p>Drop a <code>config.yaml</code> in the addon directory and changes are picked up instantly.</p>
+        </div>
+        <div class="config-grid">
+          <div>
+            <table class="config-table">
+              <thead>
+                <tr><th>Key</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>manager_type</td><td>tiling · floating · stacking</td></tr>
+                <tr><td>monitor_index</td><td>Target monitors by index, or <code>"*"</code> for all</td></tr>
+                <tr><td>animation.enabled</td><td>Toggle smooth window transitions</td></tr>
+                <tr><td>animation.duration</td><td>Transition time in milliseconds</td></tr>
+                <tr><td>styling.gap.space</td><td>Pixel gap between windows</td></tr>
+                <tr><td>styling.gap.behavior</td><td>Shared · PerWindow</td></tr>
+                <tr><td>events.debounce_ms</td><td>Delay before retiling after window events</td></tr>
+                <tr><td>filters.min_width</td><td>Minimum window width to manage</td></tr>
+                <tr><td>filters.min_height</td><td>Minimum window height to manage</td></tr>
+                <tr><td>filters.exclude_processes</td><td>Ignore windows by process name</td></tr>
+                <tr><td>filters.exclude_classes</td><td>Ignore windows by class substring</td></tr>
+                <tr><td>filters.exclude_titles</td><td>Ignore windows by title substring</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span>config.yaml</span>
+              <div style="display:flex;gap:0.5rem;align-items:center">
+                <span class="lang-tag">YAML</span>
+                <button class="copy-btn" aria-label="Copy config">Copy</button>
+              </div>
+            </div>
+<pre><span class="c"># ~/ProjectOpen/VEIL/addons/windowmanager/config.yaml</span>
+
+<span class="k">window_manager</span>:
+  <span class="n">enabled</span>: <span class="v">true</span>
+  <span class="n">manager_type</span>: <span class="s">tiling</span>
+  <span class="n">monitor_index</span>:
+    - <span class="s">"*"</span>
+
+  <span class="k">animation</span>:
+    <span class="n">enabled</span>: <span class="v">true</span>
+    <span class="n">duration</span>: <span class="v">150</span>
+
+  <span class="k">styling</span>:
+    <span class="k">gap</span>:
+      <span class="n">space</span>: <span class="v">10</span>
+      <span class="n">behavior</span>: <span class="s">"Shared"</span>
+
+  <span class="k">events</span>:
+    <span class="n">debounce_ms</span>: <span class="v">500</span>
+
+  <span class="k">filters</span>:
+    <span class="n">min_width</span>: <span class="v">1</span>
+    <span class="n">min_height</span>: <span class="v">1</span>
+    <span class="n">exclude_processes</span>: []
+    <span class="n">exclude_classes</span>:
+      - <span class="s">"Shell_TrayWnd"</span>
+      - <span class="s">"Progman"</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Install ────────────────────────────────────────── -->
+    <section class="install section" id="install">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Installation</span>
+          <h2>Up and running in minutes</h2>
+          <p>Install via VEIL's addon system or build from source.</p>
+        </div>
+        <div class="install-steps">
+          <div class="install-step">
+            <div class="step-num">1</div>
+            <h3>Install VEIL</h3>
+            <p>Make sure the VEIL platform is installed and running on your Windows machine.</p>
+          </div>
+          <div class="install-step">
+            <div class="step-num">2</div>
+            <h3>Add the Addon</h3>
+            <p>Copy the <code>windowmanager</code> addon folder into your VEIL addons directory.</p>
+          </div>
+          <div class="install-step">
+            <div class="step-num">3</div>
+            <h3>Configure</h3>
+            <p>Edit <code>config.yaml</code> to set your preferred layout, gaps, and filters.</p>
+          </div>
+          <div class="install-step">
+            <div class="step-num">4</div>
+            <h3>Launch</h3>
+            <p>VEIL will start VWM automatically. Changes to the config are picked up live.</p>
+          </div>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span>Build from source</span>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <span class="lang-tag">Shell</span>
+              <button class="copy-btn" aria-label="Copy build command">Copy</button>
+            </div>
+          </div>
+<pre><span class="c"># Clone and build</span>
+<span class="k">git</span> clone https://github.com/TheIco2/VWM.git
+<span class="k">cd</span> VWM
+<span class="k">cargo</span> build --release
+
+<span class="c"># Output binary</span>
+target/release/veil-windowmanager.exe</pre>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── CTA ───────────────────────────────────────────── -->
+    <section class="section" id="cta">
+      <div class="container">
+        <div class="cta-banner">
+          <span class="section-label">Open Source</span>
+          <h2>Ready to tile your desktop?</h2>
+          <p>VWM is open source and free. Star the repo, report issues, or contribute on GitHub.</p>
+          <div class="cta-btns">
+            <a href="#install" class="btn btn-primary">Get Started</a>
+            <a href="https://github.com/TheIco2/VWM" class="btn btn-ghost" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.021C22 6.484 17.522 2 12 2z"/></svg>
+              View on GitHub
+            </a>
+            <a href="docs.html" class="btn btn-ghost">Read Docs</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span class="footer-brand">
+          <span class="brand-badge" style="font-size:0.65rem;padding:2px 6px">VEIL</span>
+          Window Manager
+        </span>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="#features">Features</a>
+          <a href="#layouts">Layouts</a>
+          <a href="docs.html">Docs</a>
+          <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <span>MIT License &nbsp;·&nbsp; Built with Rust</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
