@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docs — VEIL Window Manager</title>
+  <meta name="description" content="Full documentation for VEIL Window Manager — configuration, layout types, filtering, architecture and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navbar ──────────────────────────────────────────── -->
+  <nav class="navbar" aria-label="Main navigation">
+    <div class="container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-badge">VEIL</span>
+        Window Manager
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#layouts">Layouts</a></li>
+        <li><a href="index.html#config">Config</a></li>
+        <li><a href="index.html#install">Install</a></li>
+        <li><a href="docs.html" class="active">Docs</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://github.com/TheIco2/VWM" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+        <a href="index.html#install" class="btn btn-primary">Get Started</a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile nav -->
+  <div class="nav-mobile" aria-hidden="true">
+    <a href="index.html#features">Features</a>
+    <a href="index.html#layouts">Layouts</a>
+    <a href="index.html#config">Config</a>
+    <a href="index.html#install">Install</a>
+    <a href="docs.html">Docs</a>
+    <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <main>
+    <div class="container">
+      <div class="docs-layout">
+
+        <!-- ── Sidebar ──────────────────────────────────── -->
+        <aside class="docs-sidebar" aria-label="Documentation navigation">
+          <div class="docs-sidebar-title">Getting Started</div>
+          <ul class="docs-nav">
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#installation">Installation</a></li>
+            <li><a href="#quickstart">Quick Start</a></li>
+          </ul>
+          <div class="docs-sidebar-title">Configuration</div>
+          <ul class="docs-nav">
+            <li><a href="#config-reference">Config Reference</a></li>
+            <li><a href="#universal-filters">Universal Filters</a></li>
+            <li><a href="#window-filters">Window Filters</a></li>
+            <li><a href="#animations">Animations</a></li>
+            <li><a href="#styling">Styling &amp; Gaps</a></li>
+            <li><a href="#events">Events</a></li>
+          </ul>
+          <div class="docs-sidebar-title">Layouts</div>
+          <ul class="docs-nav">
+            <li><a href="#layout-tiling">BSP Tiling</a></li>
+            <li><a href="#layout-floating">Floating</a></li>
+            <li><a href="#layout-stacking">Stacking</a></li>
+            <li><a href="#multi-monitor">Multi-Monitor</a></li>
+          </ul>
+          <div class="docs-sidebar-title">Internals</div>
+          <ul class="docs-nav">
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#ipc">IPC Integration</a></li>
+            <li><a href="#building">Building from Source</a></li>
+          </ul>
+        </aside>
+
+        <!-- ── Content ──────────────────────────────────── -->
+        <div class="docs-content">
+
+          <!-- Overview -->
+          <section id="overview">
+            <span class="section-label">Docs</span>
+            <h2>VEIL Window Manager</h2>
+            <p>
+              VEIL Window Manager (VWM) is a dynamic window management addon for the VEIL platform.
+              It provides automatic BSP tiling, floating, and stacking layouts for Windows —
+              written in Rust with native Win32 API integration.
+            </p>
+            <p>
+              VWM hooks into Windows accessibility event hooks to react to window events in real time,
+              debounces retile operations for performance, and exposes a YAML config that is watched
+              for changes and hot-reloaded without restarting.
+            </p>
+            <div class="note-box">
+              <strong>Platform:</strong> VWM targets Windows only. It requires the VEIL platform to be
+              installed and running.
+            </div>
+          </section>
+
+          <!-- Installation -->
+          <section id="installation">
+            <h2>Installation</h2>
+            <p>VWM ships as a VEIL addon. Place the addon folder in your VEIL addons directory and VEIL will discover and launch it automatically.</p>
+
+            <h3>Addon directory structure</h3>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Directory layout</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">Shell</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre>~/ProjectOpen/VEIL/addons/windowmanager/
+├── addon.json          <span class="c"># Addon manifest</span>
+├── bin/
+│   └── veil-windowmanager.exe
+└── config.yaml         <span class="c"># Your configuration</span></pre>
+            </div>
+
+            <h3>addon.json</h3>
+            <p>The manifest tells VEIL how to load the addon:</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>addon.json</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">JSON</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre>{
+  <span class="n">"id"</span>:       <span class="s">"veil.addon.windowmanager"</span>,
+  <span class="n">"name"</span>:     <span class="s">"Window Manager"</span>,
+  <span class="n">"package"</span>:  <span class="s">"windowmanager"</span>,
+  <span class="n">"exe_path"</span>: <span class="s">"bin/veil-windowmanager.exe"</span>,
+  <span class="n">"version"</span>:  <span class="s">"1.0.0"</span>,
+  <span class="n">"repo"</span>:     <span class="s">"https://github.com/TheIco2/VWM"</span>
+}</pre>
+            </div>
+          </section>
+
+          <!-- Quick Start -->
+          <section id="quickstart">
+            <h2>Quick Start</h2>
+            <p>Create a minimal <code>config.yaml</code> to get tiling running immediately:</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>config.yaml — minimal</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">YAML</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="k">window_manager</span>:
+  <span class="n">enabled</span>: <span class="v">true</span>
+  <span class="n">manager_type</span>: <span class="s">tiling</span>
+  <span class="n">monitor_index</span>:
+    - <span class="s">"*"</span></pre>
+            </div>
+            <p>Save the file. VWM will detect the change and retile open windows within the configured debounce window.</p>
+          </section>
+
+          <!-- Config Reference -->
+          <section id="config-reference">
+            <h2>Config Reference</h2>
+            <p>The full schema for <code>config.yaml</code>:</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>config.yaml — full schema</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">YAML</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="n">update_check</span>: <span class="v">true</span>
+<span class="n">debug</span>: <span class="v">false</span>
+<span class="n">log_level</span>: <span class="s">warn</span>   <span class="c"># trace | debug | info | warn | error</span>
+
+<span class="k">universal</span>:
+  <span class="n">exclude_processes</span>:
+    - <span class="s">"ShellExperienceHost.exe"</span>
+    - <span class="s">"taskmgr.exe"</span>
+    - <span class="s">"systemsettings.exe"</span>
+    - <span class="s">"steamwebhelper.exe"</span>
+    - <span class="s">"msiexec.exe"</span>
+
+<span class="k">window_manager</span>:
+  <span class="n">enabled</span>: <span class="v">true</span>
+  <span class="n">manager_type</span>: <span class="s">tiling</span>   <span class="c"># tiling | floating | stacking</span>
+  <span class="n">monitor_index</span>:
+    - <span class="s">"*"</span>               <span class="c"># "*" = all, or "0", "1", etc.</span>
+
+  <span class="k">animation</span>:
+    <span class="n">enabled</span>: <span class="v">true</span>
+    <span class="n">duration</span>: <span class="v">150</span>      <span class="c"># ms</span>
+
+  <span class="k">styling</span>:
+    <span class="k">gap</span>:
+      <span class="n">space</span>: <span class="v">10</span>         <span class="c"># pixels</span>
+      <span class="n">behavior</span>: <span class="s">"Shared"</span>  <span class="c"># Shared | PerWindow</span>
+
+  <span class="k">events</span>:
+    <span class="n">debounce_ms</span>: <span class="v">500</span>
+
+  <span class="k">filters</span>:
+    <span class="n">min_width</span>: <span class="v">1</span>
+    <span class="n">min_height</span>: <span class="v">1</span>
+    <span class="n">include_processes</span>: []
+    <span class="n">exclude_processes</span>: []
+    <span class="n">exclude_classes</span>:
+      - <span class="s">"Shell_TrayWnd"</span>
+      - <span class="s">"Progman"</span>
+      - <span class="s">"WorkerW"</span>
+      - <span class="s">"Windows.UI.Core"</span>
+      - <span class="s">"ApplicationFrameWindow"</span>
+    <span class="n">exclude_titles</span>:
+      - <span class="s">"Program Manager"</span>
+      - <span class="s">"NVIDIA GeForce Overlay"</span>
+      - <span class="s">"Task Manager"</span>
+      - <span class="s">"Settings"</span></pre>
+            </div>
+          </section>
+
+          <!-- Universal Filters -->
+          <section id="universal-filters">
+            <h2>Universal Filters</h2>
+            <p>
+              The <code>universal</code> block applies exclusions across all VEIL addons, not just the
+              window manager. Processes listed here are always ignored regardless of addon-level config.
+            </p>
+            <h3>exclude_processes</h3>
+            <p>A list of process executable names to exclude globally. Matching is case-insensitive and exact.</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Example</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">YAML</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="k">universal</span>:
+  <span class="n">exclude_processes</span>:
+    - <span class="s">"taskmgr.exe"</span>
+    - <span class="s">"systemsettings.exe"</span>
+    - <span class="s">"msiexec.exe"</span></pre>
+            </div>
+          </section>
+
+          <!-- Window Filters -->
+          <section id="window-filters">
+            <h2>Window Filters</h2>
+            <p>
+              The <code>filters</code> block under <code>window_manager</code> provides fine-grained
+              control over which windows VWM manages.
+            </p>
+
+            <h3>Dimension filters</h3>
+            <p><code>min_width</code> and <code>min_height</code> define the minimum size a window must have to be managed. Useful for ignoring small utility popups.</p>
+
+            <h3>Process filters</h3>
+            <p>
+              <code>include_processes</code> — if non-empty, <em>only</em> these processes are managed.<br/>
+              <code>exclude_processes</code> — these processes are always skipped.
+            </p>
+            <div class="note-box">
+              <strong>Note:</strong> <code>include_processes</code> takes priority. If it has entries, all
+              processes not on the list are excluded even if not in <code>exclude_processes</code>.
+            </div>
+
+            <h3>Class filters</h3>
+            <p><code>exclude_classes</code> matches against the Win32 window class name using a substring check. Useful for excluding system shell windows.</p>
+
+            <h3>Title filters</h3>
+            <p><code>exclude_titles</code> matches against the window title using a substring check (case-insensitive).</p>
+
+            <h3>Automatic exclusions</h3>
+            <p>VWM automatically skips windows that are:</p>
+            <ul>
+              <li>Hidden or minimized</li>
+              <li>Cloaked (virtual desktop hidden)</li>
+              <li>Tooltips or popup menus</li>
+              <li>Borderless / captionless windows</li>
+              <li>True fullscreen applications</li>
+            </ul>
+          </section>
+
+          <!-- Animations -->
+          <section id="animations">
+            <h2>Animations</h2>
+            <p>VWM smoothly moves windows to their new positions after a retile. The animation block controls this behaviour.</p>
+            <table class="config-table" style="margin-top:1rem">
+              <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td>enabled</td><td>bool</td><td>true</td><td>Toggle all animations on/off</td></tr>
+                <tr><td>duration</td><td>integer</td><td>150</td><td>Animation duration in milliseconds</td></tr>
+              </tbody>
+            </table>
+            <div class="code-block" style="margin-top:1.25rem">
+              <div class="code-block-header">
+                <span>Example — fast animations</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">YAML</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="k">animation</span>:
+  <span class="n">enabled</span>: <span class="v">true</span>
+  <span class="n">duration</span>: <span class="v">80</span></pre>
+            </div>
+          </section>
+
+          <!-- Styling -->
+          <section id="styling">
+            <h2>Styling &amp; Gaps</h2>
+            <p>Configure the pixel gap between managed windows and how it is distributed.</p>
+            <table class="config-table" style="margin-top:1rem">
+              <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td>gap.space</td><td>integer</td><td>10</td><td>Gap size in pixels</td></tr>
+                <tr><td>gap.behavior</td><td>string</td><td>Shared</td><td><code>Shared</code> — gap is split between borders. <code>PerWindow</code> — each window gets the full gap on each side.</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!-- Events -->
+          <section id="events">
+            <h2>Events</h2>
+            <p>
+              VWM listens to Windows accessibility events and retiles whenever windows are opened,
+              closed, moved, or resized. To avoid thrashing during rapid changes, retile operations
+              are debounced.
+            </p>
+            <table class="config-table" style="margin-top:1rem">
+              <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td>debounce_ms</td><td>integer</td><td>500</td><td>Milliseconds to wait after the last event before triggering a retile</td></tr>
+              </tbody>
+            </table>
+            <div class="note-box">
+              Lower values make the manager more responsive but may cause extra work during window
+              drag operations. 200–500ms is a good range for most setups.
+            </div>
+          </section>
+
+          <!-- Layout: Tiling -->
+          <section id="layout-tiling">
+            <h2>BSP Tiling Layout</h2>
+            <p>
+              Set <code>manager_type: tiling</code> to enable the binary space partitioning layout.
+              Each new window splits the screen (or the focused tile) in half, creating a balanced tree.
+            </p>
+            <h3>How BSP works</h3>
+            <ol>
+              <li>The first window occupies the full work area.</li>
+              <li>The second window splits the first tile horizontally or vertically.</li>
+              <li>Each subsequent window splits the currently focused tile.</li>
+              <li>When a window is closed, its sibling expands to fill the space.</li>
+            </ol>
+            <h3>Drag-to-reorder</h3>
+            <p>
+              Drag a window over another managed window to swap their positions in the BSP tree.
+              The layout is updated immediately after the drag is released.
+            </p>
+            <h3>Edge-drag resizing</h3>
+            <p>
+              Grab any window edge and drag to resize. VWM intercepts the resize event and adjusts
+              the BSP split point so that both the dragged window and its sibling resize together,
+              keeping the tree intact.
+            </p>
+          </section>
+
+          <!-- Layout: Floating -->
+          <section id="layout-floating">
+            <h2>Floating Layout</h2>
+            <p>
+              Set <code>manager_type: floating</code> to disable automatic tiling. Windows retain
+              their natural positions and VWM does not move them.
+            </p>
+            <p>
+              Filters, universal exclusions, and IPC communication remain active in floating mode —
+              only the automatic positioning is disabled.
+            </p>
+          </section>
+
+          <!-- Layout: Stacking -->
+          <section id="layout-stacking">
+            <h2>Stacking Layout</h2>
+            <p>
+              Set <code>manager_type: stacking</code> to stack all managed windows on top of each
+              other, each filling the full work area. Only the top-most window is visible at a time.
+            </p>
+            <p>
+              This mode is useful for single-task focus sessions or when combined with IPC commands
+              to programmatically cycle through windows.
+            </p>
+          </section>
+
+          <!-- Multi-Monitor -->
+          <section id="multi-monitor">
+            <h2>Multi-Monitor Support</h2>
+            <p>
+              VWM maintains an independent BSP state for each managed monitor. Windows are assigned
+              to monitors based on which monitor contains the majority of the window's area.
+            </p>
+            <h3>Targeting monitors</h3>
+            <p>Use the <code>monitor_index</code> list to control which monitors VWM manages:</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Examples</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">YAML</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="c"># All monitors</span>
+<span class="n">monitor_index</span>:
+  - <span class="s">"*"</span>
+
+<span class="c"># Only the primary monitor</span>
+<span class="n">monitor_index</span>:
+  - <span class="s">"0"</span>
+
+<span class="c"># Two specific monitors</span>
+<span class="n">monitor_index</span>:
+  - <span class="s">"0"</span>
+  - <span class="s">"1"</span></pre>
+            </div>
+            <h3>Boundary detection</h3>
+            <p>
+              VWM uses smart boundary-aware edge detection to prevent windows from being dragged
+              across monitor boundaries during edge-resize operations.
+            </p>
+          </section>
+
+          <!-- Architecture -->
+          <section id="architecture">
+            <h2>Architecture</h2>
+            <p>VWM is structured as a set of focused modules:</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Module overview</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">Text</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre>main.rs           <span class="c">← IPC listener &amp; event loop entry point</span>
+bootstrap.rs      <span class="c">← Addon startup, config loading</span>
+config.rs         <span class="c">← Config deserialization (serde + YAML)</span>
+layout.rs         <span class="c">← Tiling / Floating / Stacking logic</span>
+types.rs          <span class="c">← Core data structures (WindowState, Monitor...)</span>
+display_provider  <span class="c">← Monitor enumeration &amp; geometry</span>
+ipc_connector     <span class="c">← VEIL IPC integration</span>
+watchers.rs       <span class="c">← File-system config hot-reload (notify crate)</span>
+logging.rs        <span class="c">← Structured log output</span>
+window_events/    <span class="c">← SetWinEventHook setup, cleanup, dispatch</span>
+window_ops/       <span class="c">← Window enumeration, BSP, positioning, resize</span></pre>
+            </div>
+
+            <h3>Event flow</h3>
+            <ol>
+              <li>Windows fires an accessibility event (window created, moved, etc.).</li>
+              <li><code>window_events/event_manager.rs</code> receives and classifies the event.</li>
+              <li>A debounce timer resets; after <code>debounce_ms</code> elapses, a retile is triggered.</li>
+              <li><code>window_ops/window_enumeration.rs</code> collects all visible managed windows.</li>
+              <li><code>layout.rs</code> computes the new positions via the active layout algorithm.</li>
+              <li><code>window_ops/positioning.rs</code> calls <code>SetWindowPos</code> for each window.</li>
+            </ol>
+          </section>
+
+          <!-- IPC -->
+          <section id="ipc">
+            <h2>IPC Integration</h2>
+            <p>
+              VWM connects to the VEIL IPC layer on startup. This enables other VEIL components and
+              addons to send commands to the window manager at runtime — for example, to switch the
+              active layout or request a retile.
+            </p>
+            <div class="note-box">
+              <strong>Note:</strong> Full IPC command documentation will be published here once the
+              IPC API is stabilised. Check the GitHub repo for the latest updates.
+            </div>
+          </section>
+
+          <!-- Building -->
+          <section id="building">
+            <h2>Building from Source</h2>
+            <p>VWM requires a stable Rust toolchain targeting <code>x86_64-pc-windows-msvc</code>.</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Build steps</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">Shell</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="c"># Install Rust (if needed)</span>
+winget install Rustlang.Rustup
+
+<span class="c"># Clone the repo</span>
+<span class="k">git</span> clone https://github.com/TheIco2/VWM.git
+<span class="k">cd</span> VWM
+
+<span class="c"># Release build</span>
+<span class="k">cargo</span> build --release
+
+<span class="c"># Output</span>
+target/release/veil-windowmanager.exe</pre>
+            </div>
+            <h3>Debug build</h3>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>Debug</span>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span class="lang-tag">Shell</span>
+                  <button class="copy-btn" aria-label="Copy">Copy</button>
+                </div>
+              </div>
+<pre><span class="k">cargo</span> build
+<span class="c"># Outputs: target/debug/veil-windowmanager.exe</span>
+<span class="c"># Set log_level: debug in config.yaml for verbose output</span></pre>
+            </div>
+          </section>
+
+        </div><!-- /.docs-content -->
+      </div><!-- /.docs-layout -->
+    </div><!-- /.container -->
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span class="footer-brand">
+          <span class="brand-badge" style="font-size:0.65rem;padding:2px 6px">VEIL</span>
+          Window Manager
+        </span>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="index.html">Home</a>
+          <a href="index.html#features">Features</a>
+          <a href="https://github.com/TheIco2/VWM" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <span>MIT License &nbsp;·&nbsp; Built with Rust</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
